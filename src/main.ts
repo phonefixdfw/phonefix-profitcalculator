@@ -4,6 +4,9 @@ import { DEFAULT_CONFIG, type ShopConfig } from './config';
 import { setupSettings } from './settings-ui';
 import { loadSettings } from './settings';
 import { formatMoney, parseMoney } from './money';
+import { setupTabs } from './tabs';
+import { setupSavedRepairs } from './saved-repairs-ui';
+import { formatQuote, setupQuote } from './quote';
 
 const phoneIcon = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3" stroke="currentColor" stroke-width="1.6"/><path d="M10 18h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 
@@ -23,12 +26,18 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <button id="settings-toggle" class="clear-button settings-toggle" type="button" aria-expanded="false" aria-controls="settings-panel">Settings</button>
     </div>
     <section id="settings-panel" class="settings-panel" aria-labelledby="settings-heading" hidden></section>
+    <div id="tool-tabs" class="tool-tabs" role="tablist" aria-label="Repair tools">
+      <button id="calculator-tab" type="button" role="tab" aria-controls="calculator-panel" aria-selected="true">Calculator</button>
+      <button id="saved-repairs-tab" type="button" role="tab" aria-controls="saved-repairs-panel" aria-selected="false" tabindex="-1">Saved repairs</button>
+    </div>
+    <div id="calculator-panel" role="tabpanel" aria-labelledby="calculator-tab">
     <div class="calculator">
       <section class="ticket-panel" aria-labelledby="ticket-heading">
         <div class="panel-heading">
           <div><p class="eyebrow">THE INPUTS</p><h2 id="ticket-heading">Repair ticket</h2></div>
           <button id="clear" class="clear-button" type="button">Clear <span aria-hidden="true">↺</span></button>
         </div>
+        <p id="loaded-repair" class="loaded-repair" hidden></p>
         <form id="ticket-form" novalidate>
           <fieldset class="payment-field calculator-mode">
             <legend>Calculate</legend>
@@ -80,6 +89,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
             <p id="labor-note" class="field-note">For profit per hour. No labor cost is subtracted.</p>
           </div>
         </form>
+        <button id="save-current-repair" class="clear-button save-current-repair" type="button">Save current as repair</button>
         <p id="rates-note" class="rates-note"></p>
       </section>
       <section class="results-panel" aria-labelledby="results-heading">
@@ -109,6 +119,11 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
           <p id="discount-tier" class="comparison-note" hidden></p>
           <p class="tax-note">Sales tax is collected for the state and excluded from profit.</p>
         </div>
+        <div class="quote-actions">
+          <button id="copy-quote" class="primary-button" type="button" disabled>Copy quote</button>
+          <p id="quote-status" class="settings-status" role="status"></p>
+          <div id="quote-fallback" class="settings-field" hidden><label for="quote-text">Quote to copy</label><textarea id="quote-text" rows="3" readonly></textarea></div>
+        </div>
         <p id="input-status" class="input-status" role="status">Enter a repair price to see your profit.</p>
         <aside id="cliff-hint" class="cliff-hint" aria-label="Warranty pricing suggestion" aria-live="polite" hidden>
           <span class="hint-icon" aria-hidden="true">↗</span><div><h3>A small price change could help</h3><p id="cliff-copy"></p><p id="cliff-profit" class="hint-profit"></p></div>
@@ -127,6 +142,8 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         </table>
       </div>
     </details>
+    </div>
+    <section id="saved-repairs-panel" class="saved-repairs-panel" role="tabpanel" aria-labelledby="saved-repairs-tab" hidden></section>
     <footer><span>Built for the PhoneFix DFW counter.</span><span>Calculated on this device · No data sent</span></footer>
   </main>
 `;
@@ -147,6 +164,24 @@ const discountKind = element<HTMLSelectElement>('discount-kind');
 const laborInput = element<HTMLInputElement>('labor-minutes');
 const fields = ['price-value', 'tax-value', 'total-value', 'part-value', 'card-value', 'warranty-value'];
 const percent = (bps: number): string => `${bps / 100}%`;
+const selectTab = setupTabs(element('tool-tabs'));
+const setQuote = setupQuote(element('calculator-panel'));
+let repairName: string | undefined;
+let currentResult: TicketResult | undefined;
+const openRepairForm = setupSavedRepairs(element('saved-repairs-panel'), (repair) => {
+  repairName = repair.name;
+  element('loaded-repair').textContent = repair.name;
+  element('loaded-repair').hidden = false;
+  element<HTMLInputElement>('normal-mode').checked = true;
+  priceInput.value = (repair.price / 100).toFixed(2);
+  partInput.value = (repair.partCost / 100).toFixed(2);
+  screenInput.checked = repair.screenRepair;
+  laborInput.value = repair.laborHundredths === undefined ? '' : (repair.laborHundredths / 100).toFixed(2);
+  discountInput.value = '';
+  discountKind.value = 'amount';
+  update();
+  selectTab('calculator-tab');
+});
 
 let config: ShopConfig = loadSettings();
 function resetTarget(): void {
@@ -183,6 +218,8 @@ function setError(input: HTMLInputElement, errorId: string, message?: string): v
 }
 
 function showResult(result: TicketResult): void {
+  currentResult = result;
+  setQuote(formatQuote(repairName, result));
   highlightWarrantyTier(result.warrantyTierIndex);
   const loss = result.netProfit < 0;
   element('results-heading').textContent = loss ? 'Net loss' : 'Net profit';
@@ -212,6 +249,8 @@ function showResult(result: TicketResult): void {
 }
 
 function clearResult(message: string): void {
+  currentResult = undefined;
+  setQuote('');
   highlightWarrantyTier(null);
   element('results-heading').textContent = 'Net profit';
   element('profit').textContent = '—';
@@ -304,7 +343,15 @@ form.addEventListener('input', update);
 form.addEventListener('submit', (event) => { event.preventDefault(); });
 element('clear').addEventListener('click', () => {
   form.reset();
+  repairName = undefined;
+  element('loaded-repair').hidden = true;
   update();
   priceInput.focus();
+});
+element('save-current-repair').addEventListener('click', () => {
+  selectTab('saved-repairs-tab');
+  openRepairForm({ name: repairName ?? '', partCost: partInput.value,
+    price: targetMode.checked ? currentResult ? (currentResult.price / 100).toFixed(2) : '' : priceInput.value,
+    screenRepair: screenInput.checked, laborMinutes: laborInput.value });
 });
 update();

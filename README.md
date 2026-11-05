@@ -1,6 +1,6 @@
 # PhoneFix DFW repair profit calculator
 
-A small, static Vite + TypeScript app for pricing one repair at the shop counter. Runs entirely in the browser, with no backend, tracking, external fonts, or application network requests. Shop settings are saved in this browser; no data is sent.
+A small, static Vite + TypeScript app for pricing one repair at the shop counter. Runs entirely in the browser, with no backend, tracking, external fonts, or application network requests. Shop settings and saved repairs are saved in this browser; no data is sent.
 
 ## Run
 
@@ -96,3 +96,15 @@ Hand check with the default settings, screen warranty, card payment, $50 parts a
 In **Profit from a price** mode, the optional discount accepts a dollar amount or a percentage with up to two decimal places. Percent discounts round half-up to cents before subtraction. Tax, ticket total, card fee, warranty tier and margin use the discounted price. The result compares profit with and without the discount and flags warranty savings. For example, discounting $93 by $0.63 moves the total from $100.67 to $99.99: the warranty falls from $21.89 to $15.26, and profit **increases $6.01**. Discounts must be nonnegative and cannot exceed the price or 100%; an empty discount means zero.
 
 Optional **labor minutes** works in both modes. It accepts up to two decimal places, from zero to 999,999.99 minutes. `calculateProfitPerHour` takes integer hundredths of a minute and rounds the final hourly profit to cents, half-up (away from zero on a loss). $80 over 45 minutes is **$106.67/hr**. Empty or zero time displays “—”; invalid time shows an inline error and hides the hourly result. Labor time never subtracts a cost or changes the ticket's profit.
+
+## Saved repairs and customer quotes
+
+Use the **Calculator** and **Saved repairs** tabs with a tap or the left/right arrow keys. Home and End select the first and last tabs. Settings remains an inline panel above the tabs.
+
+**Add repair** saves a name (up to 120 characters), part cost, usual pre-tax price, screen warranty choice, and optional labor minutes. Repairs appear A–Z, with a name search when there are more than ten. Edit a repair or delete it after confirmation. Tapping a repair fills the calculator, switches to normal price mode, and clears any discount; the current card/cash choice stays in place. **Clear** also clears the loaded repair name.
+
+**Save current as repair** opens a prefilled form. In normal mode, it uses the usual price before any discount. In target-profit mode, it uses the calculated minimum price. Payment and temporary discounts are not saved in a preset.
+
+Repairs use their own localStorage key, `phonefix-saved-repairs`, containing `{ version: 1, repairs: [...] }`. Money is stored in integer cents and optional `laborHundredths` in hundredths of a minute. Missing, corrupt, invalid or unknown-version data starts with an empty list without modifying settings. Failed writes keep the form available with an error message. Saved repairs are specific to this browser and device; clearing site data removes them.
+
+**Copy quote** copies plain text such as `iPhone 13 screen: $129.99 + tax = $140.71`. It uses the loaded repair name or “Repair”, the current discounted pre-tax price (or suggested minimum in target mode), and the calculator's rounded tax-included total. Quotes contain no parts, fees, warranty costs or profit. A brief “Copied” message confirms success. If clipboard access is unavailable or denied, the quote appears selected in a text box for the device's Copy command. Invalid or empty tickets disable copying.
