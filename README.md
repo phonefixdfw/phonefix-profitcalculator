@@ -13,7 +13,7 @@ npm run dev
 PORT=5795 npm run dev
 ```
 
-The dev server listens on all interfaces; the default port is 5173. `PORT` is read in `vite.config.ts`.
+The dev server listens on all interfaces; the default port is 5173. `PORT` is read in `vite.config.ts`. Both dev and preview allow the shop's LAN hostname `taint`, the current machine's hostname, localhost and IP addresses, and fail if the requested port is occupied.
 
 ```sh
 npm run build       # TypeScript check, then static files in dist/
@@ -29,7 +29,7 @@ Both dev and preview respect `PORT`; preview defaults to 4173. Run `npm run buil
 
 Visit `https://calc.phone-fix.com/` once while connected and let the page finish loading. Use the browser's **Install app** / **Add to Home Screen** menu to install on a phone or desktop. The production service worker precaches all built app files, including the locally bundled QR generator, manifest and icons. The app then opens and calculates without an internet connection. Settings still live in each browser's localStorage; clearing site data removes both settings and the offline cache.
 
-Every production build generates a service worker with a content-based cache revision. On the next connected load it checks for a deploy; **Updated, reload** activates the downloaded update and reloads when convenient. Closing all app windows also lets a waiting update activate for the next launch. Old app caches are removed after activation; saved settings are retained. The worker registers only in production builds, so development and hot reload are unaffected. Serve over HTTPS (localhost also works); the host should revalidate `/sw.js` rather than cache it immutably.
+Every production build generates a service worker with a content-based cache revision. On the next connected load it checks for a deploy; **Updated, reload** activates the downloaded update and reloads when convenient. Closing all app windows also lets a waiting update activate for the next launch. Old app caches are removed after activation; saved settings are retained. The app registers the worker only in production builds. When switching a preview origin to development, Vite serves a temporary cleanup worker at `/sw.js`: even a cached production page can update to it, remove only the app's precaches, unregister and reload controlled tabs into development. Saved settings and unrelated caches are retained. Serve over HTTPS (localhost also works); the host should revalidate `/sw.js` rather than cache it immutably.
 
 The app icons are original calculator/phone artwork in `public/app-icon.svg`. To regenerate the committed PNGs after editing the artwork, install Playwright Chromium and run `node scripts/generate-icons.mjs`. The maskable version uses the same artwork inside its central safe area.
 

@@ -2,15 +2,30 @@ import { defineConfig } from 'vite';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { hostname } from 'node:os';
 
 const port = process.env.PORT === undefined ? undefined : Number(process.env.PORT);
+const allowedHosts = ['taint', hostname()];
 
 export default defineConfig({
   server: {
     port: port ?? 5173,
+    allowedHosts,
   },
-  preview: { port: port ?? 4173 },
+  preview: { port: port ?? 4173, allowedHosts },
   plugins: [{
+    name: 'phonefix-dev-worker-cleanup',
+    apply: 'serve',
+    configureServer(server) {
+      // A cached production page can hide the dev bundle. Replace its worker
+      // at the registered URL so recovery also works for those existing tabs.
+      server.middlewares.use((request, response, next) => {
+        if (request.url?.split('?')[0] !== '/sw.js') return next();
+        response.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-store' });
+        response.end(readFileSync(resolve('src/dev-service-worker.js'), 'utf8'));
+      });
+    },
+  }, {
     name: 'phonefix-offline-build',
     apply: 'build',
     closeBundle() {

@@ -1,4 +1,4 @@
-/** Register only in production; the Vite development server never gets a worker. */
+/** Register only in production; Vite serves a cleanup worker for existing installs. */
 export async function setupPwa(): Promise<void> {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
   const banner = document.createElement('aside');
