@@ -1,5 +1,5 @@
 import './style.css';
-import { calculateTicket, type TicketResult } from './calc';
+import { calculateTicket, getWarrantyTierReference, type TicketResult } from './calc';
 import { DEFAULT_CONFIG, type ShopConfig } from './config';
 import { setupSettings } from './settings-ui';
 import { loadSettings } from './settings';
@@ -79,6 +79,17 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         <p id="tier-limit" class="tier-limit" hidden></p>
       </section>
     </div>
+    <details id="warranty-reference" class="warranty-reference">
+      <summary>Warranty tiers <span>Tier quick reference</span></summary>
+      <div class="warranty-reference-content">
+        <p id="warranty-reference-note"></p>
+        <table aria-label="Warranty tiers" aria-describedby="warranty-reference-note">
+          <colgroup><col class="reference-tier-column"><col><col><col></colgroup>
+          <thead><tr><th scope="col">Tier</th><th scope="col">Ticket total <span>tax included</span></th><th scope="col">Warranty cost</th><th scope="col">Max repair price <span>before tax</span></th></tr></thead>
+          <tbody id="warranty-reference-rows"></tbody>
+        </table>
+      </div>
+    </details>
     <footer><span>Built for the PhoneFix DFW counter.</span><span>Calculated on this device · No data sent</span></footer>
   </main>
 `;
@@ -99,8 +110,23 @@ let config: ShopConfig = loadSettings();
 function updateRates(): void {
   element('rates-note').textContent = `Shop rates: ${percent(config.salesTaxBps)} sales tax · ${percent(config.cardFeeBps)} + ${formatMoney(config.cardFixedFee)} card fee on the total after tax.`;
   element('tax-label').textContent = `Sales tax · ${percent(config.salesTaxBps)}`;
+  element('warranty-reference-note').textContent = `Screen warranty tiers at ${percent(config.salesTaxBps)} sales tax. Ranges include both endpoints. The current ticket’s tier is highlighted.`;
+  element('warranty-reference-rows').innerHTML = getWarrantyTierReference(config).map((tier, index) => `
+    <tr>
+      <th scope="row">${index + 1}</th>
+      <td>${formatMoney(tier.min)} ${tier.max === null ? 'and up' : `– ${formatMoney(tier.max)}`}</td>
+      <td>${formatMoney(tier.cost)}</td>
+      <td class="reference-max">${tier.maxRepairPrice === null ? '—' : formatMoney(tier.maxRepairPrice)}</td>
+    </tr>`).join('');
 }
 updateRates();
+
+function highlightWarrantyTier(index: number | null): void {
+  element('warranty-reference-rows').querySelectorAll('tr').forEach((row, rowIndex) => {
+    if (rowIndex === index) row.setAttribute('aria-current', 'true');
+    else row.removeAttribute('aria-current');
+  });
+}
 
 function setError(input: HTMLInputElement, errorId: string, message?: string): void {
   input.setAttribute('aria-invalid', String(Boolean(message)));
@@ -110,6 +136,7 @@ function setError(input: HTMLInputElement, errorId: string, message?: string): v
 }
 
 function showResult(result: TicketResult): void {
+  highlightWarrantyTier(result.warrantyTierIndex);
   const loss = result.netProfit < 0;
   element('results-heading').textContent = loss ? 'Net loss' : 'Net profit';
   element('profit').textContent = formatMoney(result.netProfit);
@@ -138,6 +165,7 @@ function showResult(result: TicketResult): void {
 }
 
 function clearResult(message: string): void {
+  highlightWarrantyTier(null);
   element('results-heading').textContent = 'Net profit';
   element('profit').textContent = '—';
   element('profit-status').textContent = 'Ready to calculate';

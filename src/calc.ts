@@ -22,6 +22,11 @@ export interface WarrantyPricing {
   readonly currentTierMaxPrice: number | null;
 }
 
+export interface WarrantyTierReference extends WarrantyTier {
+  /** null means this tier has no upper limit. */
+  readonly maxRepairPrice: number | null;
+}
+
 export interface TicketResult {
   readonly price: number;
   readonly partCost: number;
@@ -75,6 +80,14 @@ export function highestPriceForTotal(maxTotal: number, salesTaxBps: number): num
     else high = mid - 1;
   }
   return low;
+}
+
+/** Use the calculator's rounded tax search for every tier in the active settings. */
+export function getWarrantyTierReference(config: ShopConfig = DEFAULT_CONFIG): WarrantyTierReference[] {
+  return config.warrantyTiers.map((tier) => ({
+    ...tier,
+    maxRepairPrice: tier.max === null ? null : highestPriceForTotal(tier.max, config.salesTaxBps),
+  }));
 }
 
 function calculateBase(input: TicketInput, config: ShopConfig): Omit<TicketResult, 'warrantyPricing'> {

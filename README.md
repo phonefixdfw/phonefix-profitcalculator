@@ -58,6 +58,8 @@ The engine binary-searches integer pre-tax cents to find the highest price whose
 
 It also returns the highest pre-tax price for the current tier, even when no lower-price hint applies. The first tier's cap is $92.37; the second is $138.56. The top tier has no cap. No warranty hints apply to non-screen repairs. Tests cover every tier boundary, all finite price caps (including the next cent), equal-profit hints, cash, custom settings, and the open-ended tier.
 
+Open **Warranty tiers** below the calculator for a quick reference showing every tier's tax-included range, warranty cost, and highest repair price before tax. It uses the same rounded-tax search as the pricing hints and follows saved settings, including tax rate and tier edits. The current screen-repair tier is highlighted; the last tier says “and up” and has no maximum. The reference starts collapsed and sits after the inputs and results, so opening it does not move them on a phone.
+
 ## Counter behavior and input limits
 
 - Default to a screen repair paid by card, with $0 parts. Clear restores these defaults and focuses the blank price for the next ticket.
