@@ -166,3 +166,17 @@ describe('rounding, input safety and configurable rates', () => {
     expect(Number.isFinite(result.margin)).toBe(true);
   });
 });
+
+describe('individual shop setting changes', () => {
+  const input: TicketInput = { price: 9_100, partCost: 0, payment: 'card', screenRepair: true };
+  it('uses a changed tax rate for tax and the warranty tier', () => {
+    expect(calculateTicket(input, { ...DEFAULT_CONFIG, salesTaxBps: 1_000 })).toMatchObject({ tax: 910, ticketTotal: 10_010, warranty: 2_189 });
+  });
+  it('uses a changed percentage and fixed card fee', () => {
+    expect(calculateTicket(input, { ...DEFAULT_CONFIG, cardFeeBps: 300, cardFixedFee: 50 })).toMatchObject({ cardFee: 346, netProfit: 7_228 });
+  });
+  it('uses a changed warranty cost for the selected tier', () => {
+    const warrantyTiers = DEFAULT_CONFIG.warrantyTiers.map((tier, index) => index === 0 ? { ...tier, cost: 2_000 } : tier);
+    expect(calculateTicket(input, { ...DEFAULT_CONFIG, warrantyTiers })).toMatchObject({ warranty: 2_000, warrantyTierIndex: 0, netProfit: 6_903 });
+  });
+});

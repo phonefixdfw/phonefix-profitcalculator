@@ -1,6 +1,8 @@
 import './style.css';
 import { calculateTicket, type TicketResult } from './calc';
-import { DEFAULT_CONFIG } from './config';
+import { DEFAULT_CONFIG, type ShopConfig } from './config';
+import { setupSettings } from './settings-ui';
+import { loadSettings } from './settings';
 import { formatMoney, parseMoney } from './money';
 
 const phoneIcon = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3" stroke="currentColor" stroke-width="1.6"/><path d="M10 18h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
@@ -18,7 +20,9 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <p class="eyebrow">EVERY REPAIR. EVERY DOLLAR.</p>
       <h1>Know what you keep.</h1>
       <p class="intro-copy">Your repair profit, with the real costs built in.</p>
+      <button id="settings-toggle" class="clear-button settings-toggle" type="button" aria-expanded="false" aria-controls="settings-panel">Settings</button>
     </div>
+    <section id="settings-panel" class="settings-panel" aria-labelledby="settings-heading" hidden></section>
     <div class="calculator">
       <section class="ticket-panel" aria-labelledby="ticket-heading">
         <div class="panel-heading">
@@ -91,8 +95,12 @@ const cardInput = element<HTMLInputElement>('card');
 const fields = ['price-value', 'tax-value', 'total-value', 'part-value', 'card-value', 'warranty-value'];
 const percent = (bps: number): string => `${bps / 100}%`;
 
-element('rates-note').textContent = `Shop rates: ${percent(DEFAULT_CONFIG.salesTaxBps)} sales tax · ${percent(DEFAULT_CONFIG.cardFeeBps)} card fee on the total after tax.`;
-element('tax-label').textContent = `Sales tax · ${percent(DEFAULT_CONFIG.salesTaxBps)}`;
+let config: ShopConfig = loadSettings();
+function updateRates(): void {
+  element('rates-note').textContent = `Shop rates: ${percent(config.salesTaxBps)} sales tax · ${percent(config.cardFeeBps)} + ${formatMoney(config.cardFixedFee)} card fee on the total after tax.`;
+  element('tax-label').textContent = `Sales tax · ${percent(config.salesTaxBps)}`;
+}
+updateRates();
 
 function setError(input: HTMLInputElement, errorId: string, message?: string): void {
   input.setAttribute('aria-invalid', String(Boolean(message)));
@@ -110,7 +118,7 @@ function showResult(result: TicketResult): void {
   element('margin').textContent = `${((result.margin ?? 0) * 100).toFixed(1)}% margin · before overhead`;
   const values = [result.price, result.tax, result.ticketTotal, result.partCost, result.cardFee, result.warranty];
   fields.forEach((id, index) => { element(id).textContent = formatMoney(values[index]); });
-  element('card-detail').textContent = cardInput.checked ? percent(DEFAULT_CONFIG.cardFeeBps) : 'cash · no fee';
+  element('card-detail').textContent = cardInput.checked ? `${percent(config.cardFeeBps)} + ${formatMoney(config.cardFixedFee)}` : 'cash · no fee';
   element('warranty-detail').textContent = result.warrantyTierIndex === null ? 'not a screen repair' : `tier ${result.warrantyTierIndex + 1} · 1 year`;
 
   const hint = result.warrantyPricing?.lowerTierHint;
@@ -158,11 +166,16 @@ function update(): void {
     clearResult('Enter a repair price above $0.00 to see your profit.');
     return;
   }
-  const result = calculateTicket({ price: price.cents, partCost: part.cents, screenRepair: screenInput.checked, payment: cardInput.checked ? 'card' : 'cash' });
+  const result = calculateTicket({ price: price.cents, partCost: part.cents, screenRepair: screenInput.checked, payment: cardInput.checked ? 'card' : 'cash' }, config);
   showResult(result);
   element('input-status').hidden = true;
 }
 
+setupSettings(element('settings-panel'), element<HTMLButtonElement>('settings-toggle'), config, (next) => {
+  config = next;
+  updateRates();
+  update();
+}, DEFAULT_CONFIG);
 form.addEventListener('input', update);
 form.addEventListener('submit', (event) => { event.preventDefault(); });
 element('clear').addEventListener('click', () => {
