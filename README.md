@@ -23,7 +23,11 @@ npx playwright install chromium
 npm run test:e2e    # Desktop Chromium and 390px phone smoke tests
 ```
 
-Playwright starts the dev server on port 5795 (or `PORT`) and stops it afterward; locally it can reuse an existing server. CI installs Chromium and runs build, unit tests and browser tests. Deploy the contents of `dist/` to a static host.
+Run `npm run build` before the e2e suite, which also checks the generated search-engine directives in `dist/`. Playwright starts the dev server on port 5795 (or `PORT`) and stops it afterward; locally it can reuse an existing server. CI installs Chromium and runs build, unit tests and browser tests. Deploy the contents of `dist/` to a static host.
+
+## Search engines
+
+`public/robots.txt` is copied to the build root and disallows crawling for all user agents. The HTML includes `robots` (`noindex, nofollow, noarchive, nosnippet`) and `googlebot` (`noindex, nofollow`) meta directives. No sitemap or social preview tags are published. These directives rely on crawler compliance; the calculator remains publicly accessible without a login. No hosting header configuration is tracked in this repo; the host can also send `X-Robots-Tag: noindex, nofollow` on all paths.
 
 ## Rates and money contract
 
