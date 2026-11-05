@@ -1,3 +1,67 @@
-# phonefix-profitcalculator
+# PhoneFix DFW repair profit calculator
 
-profit calculator for repairs
+A small, static Vite + TypeScript app for pricing one repair at the shop counter. Runs entirely in the browser, with no backend, tracking, external fonts, or application network requests. Nothing is saved or sent. An editable settings screen is follow-up issue #2.
+
+## Run
+
+Requires Node.js 22.12+ and npm.
+
+```sh
+npm install
+npm run dev
+# Custom preview port (the server fails if the port is occupied):
+PORT=5795 npm run dev
+```
+
+The dev server listens on all interfaces; the default port is 5173. `PORT` is read in `vite.config.ts`.
+
+```sh
+npm run build       # TypeScript check, then static files in dist/
+npm run preview     # Serve the production build locally
+npm test            # Vitest unit tests
+npx playwright install chromium
+npm run test:e2e    # Desktop Chromium and 390px phone smoke tests
+```
+
+Playwright starts the dev server on port 5795 (or `PORT`) and stops it afterward; locally it can reuse an existing server. CI installs Chromium and runs build, unit tests and browser tests. Deploy the contents of `dist/` to a static host.
+
+## Rates and money contract
+
+The owner's real rates live in **`src/config.ts`**, in `DEFAULT_CONFIG`: 8.25% sales tax, a 2% Square card fee on the tax-included total, a $0 fixed card fee, and all 12 screen-warranty tiers. These are shop-provided business inputs, not a tax-rate lookup. All money in config and calculation inputs/outputs is **integer cents**. Rates are integer basis points: 825 = 8.25%, 200 = 2%.
+
+Warranty tiers are an ordered list of `{ min, max, cost }` in cents. Both bounds are inclusive; only the last tier has `max: null` (no upper limit). Tier selection uses the **tax-included ticket total**. Screen repairs include the shop-paid 1-year accidental damage warranty; other repairs have no warranty charge.
+
+`calculateTicket(input, config = DEFAULT_CONFIG)` in **`src/calc.ts`** is pure and accepts custom `ShopConfig` values so the settings screen can supply saved rates later. Custom configs must have nonnegative integer basis-point rates, cent amounts, and contiguous ordered tiers covering zero upward.
+
+## Calculation order and rounding
+
+1. **Tax** = pre-tax repair price × tax rate, rounded half-up to the nearest cent. **Ticket total** = price + rounded tax.
+2. **Card fee**, for card payments only = ticket total × card rate, rounded half-up to the nearest cent, plus the fixed fee in cents. Adding the integer fixed fee before or after rounding gives the same result. Cash has no fee.
+3. **Warranty**, for screen repairs only = cost of the tier containing the ticket total.
+4. **Net profit** = pre-tax price − part cost − card fee − warranty. Tax goes to the state: it is neither revenue nor a cost in this formula.
+5. **Margin** = net profit ÷ pre-tax price. The engine returns `null` for a zero-price margin. This is profit before labor, overhead and income taxes.
+
+Percentage calculations use integer `BigInt` arithmetic and explicit half-up rounding, so floating-point multiplication cannot move a ticket across a cent boundary. Only the final margin is a floating-point ratio. Input text is parsed directly into cents without rounding extra decimals.
+
+Examples with a $0 part cost, card payment and screen repair:
+
+| Price | Tax | Ticket total | Card fee | Warranty | Net profit |
+| --- | --- | --- | --- | --- | --- |
+| $91.00 | $7.51 | $98.51 | $1.97 | $15.26 (tier 1) | $73.77 |
+| $93.00 | $7.67 | $100.67 | $2.01 | $21.89 (tier 2) | $69.10 |
+| $92.37 | $7.62 | $99.99 | $2.00 | $15.26 (tier 1) | $75.11 |
+| $92.38 | $7.62 | $100.00 | $2.00 | $21.89 (tier 2) | $68.49 |
+
+## Warranty pricing hints
+
+The engine binary-searches integer pre-tax cents to find the highest price whose **rounded** tax-included total fits in the previous tier. It recalculates profit using the same parts and payment method, and returns a hint only if that price earns the same or more profit. At $93, the hint recommends $92.37 and shows **$6.01 more profit** ($75.11). There is no lower-tier hint at $91.
+
+It also returns the highest pre-tax price for the current tier, even when no lower-price hint applies. The first tier's cap is $92.37; the second is $138.56. The top tier has no cap. No warranty hints apply to non-screen repairs. Tests cover every tier boundary, all finite price caps (including the next cent), equal-profit hints, cash, custom settings, and the open-ended tier.
+
+## Counter behavior and input limits
+
+- Default to a screen repair paid by card, with $0 parts. Clear restores these defaults and focuses the blank price for the next ticket.
+- Enter dollars and up to two decimal places, without currency signs, commas or exponent notation. Negative, blank, malformed or excessive amounts show a short message and clear the result. A zero price shows a prompt instead of a misleading negative warranty-only profit.
+- Price and parts are each capped at **$999,999.99** to reject accidental huge input and keep the counter UI readable. The pure engine accepts zero cents but rejects negative, fractional, non-finite and over-limit monetary inputs.
+- Losses show a red result and a “Loss” label. The margin is rounded to one decimal place for display.
+- The layout supports desktop and phone widths with labeled decimal inputs and keyboard-accessible controls. Live results do not move focus.

@@ -1,0 +1,113 @@
+:root {
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #202c29;
+  background: #f5f6f2;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input { font: inherit; }
+button, a, input, label { -webkit-tap-highlight-color: transparent; }
+button, input { accent-color: #245c48; }
+a { color: inherit; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 3px solid #327a61; outline-offset: 4px; }
+
+.site-header { height: 88px; padding: 0 max(24px, calc((100vw - 1120px) / 2)); display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid #e2e6dc; }
+.brand { display: flex; align-items: center; gap: 11px; font-size: 21px; font-weight: 750; text-decoration: none; letter-spacing: -.6px; }
+.brand-icon { background: #153f36; color: #e3f3b9; display: grid; place-items: center; width: 38px; height: 42px; border-radius: 11px; }
+.brand-icon svg { width: 25px; height: 27px; }
+.brand-place { font-weight: 450; color: #557266; }
+.header-caption { display: flex; align-items: center; gap: 8px; color: #58665c; font-size: 12px; }
+.status-dot { width: 6px; height: 6px; background: #608959; border-radius: 50%; }
+main { max-width: 1056px; margin: 0 auto; padding: 50px 28px 24px; }
+.intro { margin-bottom: 32px; }
+.eyebrow { color: #5a705e; font-size: 10px; font-weight: 750; letter-spacing: 1.8px; margin: 0 0 12px; }
+h1 { font-size: clamp(30px, 4vw, 42px); letter-spacing: -1.6px; line-height: 1.15; margin: 0 0 14px; font-weight: 650; }
+.intro-copy { color: #627067; margin: 0; font-size: 15px; line-height: 1.6; }
+.calculator { display: grid; grid-template-columns: .95fr 1.05fr; gap: 24px; align-items: start; }
+.ticket-panel, .results-panel { min-width: 0; }
+.ticket-panel { background: #fff; border: 1px solid #e0e5da; border-radius: 18px; padding: 28px; box-shadow: 0 4px 18px #1c382006; }
+.panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 30px; }
+.panel-heading .eyebrow { margin-bottom: 8px; }
+h2 { font-size: 21px; font-weight: 650; letter-spacing: -.5px; margin: 0; }
+.clear-button { min-height: 44px; padding: 8px 12px; background: #f5f6f2; border: 1px solid #e3e7dd; border-radius: 8px; cursor: pointer; color: #526458; font-size: 13px; }
+.clear-button span { margin-left: 8px; font-size: 18px; }
+.clear-button:hover { background: #eaf0e3; }
+.field { margin-bottom: 24px; }
+.field > label { display: flex; align-items: baseline; gap: 8px; margin-bottom: 9px; font-size: 14px; font-weight: 650; }
+.field > label span { font-size: 11px; font-weight: 400; color: #6d786d; }
+.money-field { display: flex; align-items: center; border: 1px solid #cfd8ca; border-radius: 9px; background: #fcfdfb; overflow: hidden; }
+.money-field:focus-within { border-color: #326d51; box-shadow: 0 0 0 3px #326d5117; }
+.money-field:has([aria-invalid="true"]) { border-color: #b34b45; }
+.money-field > span { color: #7d897b; font-size: 22px; padding-left: 16px; }
+.money-field input { width: 100%; min-width: 0; min-height: 60px; border: 0; background: transparent; font-size: 26px; letter-spacing: -.7px; padding: 12px 14px 12px 10px; color: #203c2f; outline: none; }
+.money-field input::placeholder { color: #a8b2a2; }
+.field-error { color: #a03631; margin: 7px 0 0; font-size: 12px; line-height: 1.5; }
+.screen-option { display: flex; align-items: center; gap: 12px; background: #f5f7f0; padding: 16px 14px; border: 1px solid #e3e8d9; border-radius: 10px; cursor: pointer; }
+.screen-option input { width: 20px; height: 20px; margin: 0; flex-shrink: 0; }
+.option-title, .option-description { display: block; }
+.option-title { font-size: 14px; font-weight: 650; margin-bottom: 5px; }
+.option-description { font-size: 11px; color: #63735b; line-height: 1.5; }
+.payment-field { border: 0; padding: 0; margin: 24px 0 0; }
+.payment-field legend { font-size: 14px; font-weight: 650; margin-bottom: 10px; padding: 0; }
+.payment-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.payment-options label { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; border: 1px solid #dbe1d5; border-radius: 9px; font-size: 14px; cursor: pointer; }
+.payment-options label:has(:checked) { background: #eef3e7; border-color: #6e8d62; color: #284b36; }
+.payment-options input { width: 16px; height: 16px; margin: 0; }
+.rates-note { border-top: 1px solid #edf0e7; padding-top: 20px; margin: 24px 0 0; font-size: 11px; color: #6c7868; line-height: 1.7; }
+.profit-card { background: #153f36; color: #f1f6e9; padding: 25px 28px 24px; border-radius: 17px; position: relative; }
+.profit-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.profit-heading h2 { font-size: 14px; font-weight: 500; letter-spacing: 0; }
+.profit-badge { border: 1px solid #ffffff24; border-radius: 20px; padding: 6px 9px; font-size: 10px; color: #d3e6c8; }
+#profit { display: block; font-size: clamp(36px, 4.5vw, 54px); font-weight: 600; line-height: 1.2; letter-spacing: -2px; margin: 17px 0 10px; overflow-wrap: anywhere; }
+#margin { font-size: 12px; color: #c0d5bf; margin: 0; line-height: 1.5; }
+.profit-card.is-loss { background: #802f30; }
+.is-loss #profit { color: #ffe6e0; }
+.is-loss #margin, .is-loss .profit-badge { color: #ffd7cf; }
+.breakdown { padding: 25px 8px 0; }
+.breakdown-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+h3 { font-size: 13px; font-weight: 650; margin: 0; }
+.breakdown-heading > span { color: #78816f; font-size: 10px; letter-spacing: 1px; }
+dl { margin: 0; }
+.breakdown-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin: 15px 0; font-size: 13px; }
+dt { min-width: 0; color: #596557; line-height: 1.5; }
+dt span { font-size: 10px; color: #6a7963; margin-left: 5px; }
+dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; min-width: 0; text-align: right; }
+.ticket-total { border-top: 1px solid #dde3d6; border-bottom: 1px solid #dde3d6; padding: 14px 0; }
+.ticket-total dt { font-weight: 650; color: #2e3e2e; }
+.ticket-total dt span { font-weight: 400; }
+.tax-note { font-size: 10px; line-height: 1.6; color: #6a7963; margin: 17px 0 0; }
+.input-status { background: #e9eee2; border-radius: 10px; color: #54694c; font-size: 13px; padding: 16px; margin: 22px 0 0; line-height: 1.6; }
+.cliff-hint { display: flex; gap: 12px; background: #fbf2dd; border: 1px solid #e9d9af; border-radius: 12px; padding: 17px; margin-top: 22px; color: #685026; }
+.hint-icon { width: 25px; height: 25px; display: grid; place-items: center; border-radius: 7px; background: #efdfb5; flex-shrink: 0; }
+.cliff-hint h3 { line-height: 1.5; }
+.cliff-hint p { font-size: 12px; line-height: 1.7; margin: 7px 0 0; }
+.cliff-hint .hint-profit { font-weight: 650; }
+.tier-limit { font-size: 11px; line-height: 1.7; color: #5c7053; padding: 0 8px; margin: 17px 0 0; }
+footer { display: flex; justify-content: space-between; gap: 14px; font-size: 10px; color: #71816b; border-top: 1px solid #e0e6d9; margin-top: 38px; padding-top: 20px; line-height: 1.6; }
+
+@media (max-width: 700px) {
+  .site-header { height: 72px; padding: 0 20px; }
+  .header-caption { font-size: 0; gap: 0; }
+  .status-dot { width: 7px; height: 7px; }
+  main { padding: 30px 20px 24px; }
+  .intro { margin-bottom: 25px; }
+  .intro-copy { font-size: 13px; }
+  .calculator { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .ticket-panel { padding: 23px; }
+  .panel-heading { margin-bottom: 24px; }
+  .field { margin-bottom: 19px; }
+  .money-field input { min-height: 56px; }
+  .profit-card { padding: 24px; }
+  #profit { font-size: 44px; }
+  footer { flex-direction: column; gap: 6px; margin-top: 30px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .money-field, .clear-button, .payment-options label { transition: background-color 140ms, border-color 140ms, box-shadow 140ms; }
+}
