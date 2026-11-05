@@ -56,7 +56,7 @@ export function setupSettingsTransfer(container: HTMLElement, getCurrent: () => 
         ['Card fee', percentage(current.cardFeeBps), percentage(config.cardFeeBps)],
         ['Fixed card fee', formatMoney(current.cardFixedFee), formatMoney(config.cardFixedFee)],
         ['Warranty tiers', String(current.warrantyTiers.length), String(config.warrantyTiers.length)],
-        ['Target profit', 'No saved target profit', 'No saved target profit'],
+        ['Target profit', formatMoney(current.defaultTargetProfit), formatMoney(config.defaultTargetProfit)],
       ]) {
         const row = document.createElement('div');
         row.className = 'breakdown-row';

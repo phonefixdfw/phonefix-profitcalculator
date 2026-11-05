@@ -137,3 +137,120 @@ export function calculateTicket(input: TicketInput, config: ShopConfig = DEFAULT
   }
   return { ...result, warrantyPricing };
 }
+
+/** Amount is cents; percent is basis points (100 = 1%). */
+export interface Discount {
+  readonly kind: 'amount' | 'percent';
+  readonly value: number;
+}
+
+export function calculateDiscountedTicket(input: TicketInput, discount: Discount, config: ShopConfig = DEFAULT_CONFIG) {
+  const original = calculateTicket(input, config);
+  assertNonNegativeInteger(discount.value, 'Discount');
+  const limit = discount.kind === 'percent' ? 10_000 : input.price;
+  if (discount.value > limit) throw new RangeError('Discount cannot exceed the repair price or 100%.');
+  const discountAmount = discount.kind === 'percent' ? applyRate(input.price, discount.value) : discount.value;
+  const ticket = calculateTicket({ ...input, price: input.price - discountAmount }, config);
+  return {
+    original, ticket, discountAmount,
+    profitCost: original.netProfit - ticket.netProfit,
+    cheaperWarrantyTier: ticket.warranty < original.warranty,
+  };
+}
+
+/** Minutes use hundredths, parsed directly from decimal text, like money inputs. */
+export function calculateProfitPerHour(netProfit: number, laborMinutesHundredths: number | null): number | null {
+  if (!Number.isSafeInteger(netProfit)) throw new RangeError('Profit must be safe integer cents.');
+  if (laborMinutesHundredths === null || laborMinutesHundredths === 0) return null;
+  assertNonNegativeInteger(laborMinutesHundredths, 'Labor minutes');
+  if (laborMinutesHundredths > MAX_MONEY_CENTS) throw new RangeError('Labor minutes are too large.');
+  const numerator = BigInt(Math.abs(netProfit)) * 6_000n;
+  const denominator = BigInt(laborMinutesHundredths);
+  const rounded = (2n * numerator + denominator) / (2n * denominator);
+  if (rounded > BigInt(Number.MAX_SAFE_INTEGER)) throw new RangeError('Hourly profit is too large.');
+  return rounded === 0n ? 0 : Number(rounded) * (netProfit < 0 ? -1 : 1);
+}
+
+export interface TargetProfitInput extends Omit<TicketInput, 'price'> {
+  readonly targetProfit: number;
+}
+
+export interface TargetPriceResult {
+  readonly minimum: TicketResult;
+  /** null if the next .99 price exceeds the counter's price limit. */
+  readonly nice: TicketResult | null;
+  readonly previousTierMaxPrice: number | null;
+}
+
+function floorDivide(n: bigint, positiveDivisor: bigint): bigint {
+  const quotient = n / positiveDivisor;
+  return n < 0n && n % positiveDivisor !== 0n ? quotient - 1n : quotient;
+}
+
+const ceilDivide = (n: bigint, d: bigint) => -floorDivide(-n, d);
+
+/**
+ * Search each tier separately: profit can drop at a warranty cliff and even
+ * within a tier at unusual tax/card rates. Never binary-search net profit.
+ */
+export function findTargetPrice(input: TargetProfitInput, config: ShopConfig = DEFAULT_CONFIG): TargetPriceResult | null {
+  assertNonNegativeInteger(input.targetProfit, 'Target profit');
+  if (input.targetProfit > MAX_MONEY_CENTS) throw new RangeError('Target profit is too large.');
+  calculateTicket({ ...input, price: 0 }, config); // Validate parts and calculation settings.
+  const rate = BigInt(input.payment === 'card' ? config.cardFeeBps : 0);
+  const slope = 100_000_000n - rate * (10_000n + BigInt(config.salesTaxBps));
+  // Combined tax/fee rounding differs from the unrounded fee by at most this
+  // numerator over 100,000,000. This makes the ordinary cent search very small.
+  const roundingBound = (rate + 10_000n) * 5_000n;
+  const tiers = input.screenRepair ? config.warrantyTiers : [{ min: 0, max: null, cost: 0 }];
+  let low = 0;
+  for (const tier of tiers) {
+    const high = tier.max === null ? MAX_MONEY_CENTS : Math.min(MAX_MONEY_CENTS, highestPriceForTotal(tier.max, config.salesTaxBps));
+    const cost = BigInt(input.partCost) + BigInt(input.targetProfit) + BigInt(tier.cost)
+      + BigInt(input.payment === 'card' ? config.cardFixedFee : 0);
+    let start = Math.max(low, Number(cost));
+    let end = high;
+    if (slope > 0n) {
+      start = Math.max(start, Number(ceilDivide(cost * 100_000_000n - roundingBound, slope)));
+      // A cheaper configured tier may already meet the target at its first cent.
+      end = Math.min(end, Math.max(start, Number(ceilDivide(cost * 100_000_000n + roundingBound, slope))));
+    }
+    let best: number | null = null;
+    if (start <= end && end - start < 10_000) {
+      for (let price = start; price <= end; price++) {
+        if (calculateTicket({ ...input, price }, config).netProfit >= input.targetProfit) { best = price; break; }
+      }
+    } else if (start <= end) {
+      // Near a 100% effective fee, scanning cents could take millions of steps.
+      // Write price = 10,000*k + r. Tax rounding repeats for each r; the exact
+      // half-up fee inequality becomes slope*k >= rhs, with no approximation.
+      // round(rate*total/10,000) <= price-cost is equivalent to
+      // rate*total <= 10,000*(price-cost) + 4,999.
+      for (let r = 0; r < 10_000 && r <= end; r++) {
+        let k = BigInt(Math.max(0, Math.ceil((start - r) / 10_000)));
+        const maxK = BigInt(Math.floor((end - r) / 10_000));
+        const totalR = BigInt(r + applyRate(r, config.salesTaxBps));
+        const rhs = cost * 10_000n + rate * totalR - BigInt(r) * 10_000n - 4_999n;
+        if (slope > 0n) k = k > ceilDivide(rhs, slope) ? k : ceilDivide(rhs, slope);
+        if (k > maxK || slope * k < rhs) continue;
+        const price = Number(k) * 10_000 + r;
+        if (best === null || price < best) best = price;
+      }
+    }
+    if (best !== null) {
+      const minimum = calculateTicket({ ...input, price: best }, config);
+      if (minimum.netProfit < input.targetProfit) throw new Error('Target price verification failed.');
+      const nicePrice = Math.floor(best / 100) * 100 + 99;
+      const index = minimum.warrantyTierIndex;
+      return {
+        minimum,
+        nice: nicePrice <= MAX_MONEY_CENTS ? calculateTicket({ ...input, price: nicePrice }, config) : null,
+        previousTierMaxPrice: index !== null && index > 0
+          ? highestPriceForTotal(config.warrantyTiers[index - 1].max!, config.salesTaxBps) : null,
+      };
+    }
+    low = high + 1;
+    if (low > MAX_MONEY_CENTS) break;
+  }
+  return null;
+}

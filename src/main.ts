@@ -1,5 +1,5 @@
 import './style.css';
-import { calculateTicket, getWarrantyTierReference, type TicketResult } from './calc';
+import { calculateDiscountedTicket, calculateProfitPerHour, findTargetPrice, getWarrantyTierReference, type TicketResult } from './calc';
 import { DEFAULT_CONFIG, type ShopConfig } from './config';
 import { setupSettings } from './settings-ui';
 import { loadSettings } from './settings';
@@ -31,10 +31,22 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
           <button id="clear" class="clear-button" type="button">Clear <span aria-hidden="true">↺</span></button>
         </div>
         <form id="ticket-form" novalidate>
-          <div class="field">
+          <fieldset class="payment-field calculator-mode">
+            <legend>Calculate</legend>
+            <div class="payment-options">
+              <label><input id="normal-mode" type="radio" name="mode" value="profit" checked /><span>Profit from a price</span></label>
+              <label><input id="target-mode" type="radio" name="mode" value="target" /><span>What should I charge?</span></label>
+            </div>
+          </fieldset>
+          <div id="price-field" class="field">
             <label for="price">Repair price <span>before tax</span></label>
             <div class="money-field"><span aria-hidden="true">$</span><input id="price" name="price" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" aria-describedby="price-error" spellcheck="false" /></div>
             <p id="price-error" class="field-error" hidden></p>
+          </div>
+          <div id="target-field" class="field" hidden>
+            <label for="target-profit">Target profit</label>
+            <div class="money-field"><span aria-hidden="true">$</span><input id="target-profit" name="target-profit" type="text" inputmode="decimal" autocomplete="off" aria-describedby="target-error" spellcheck="false" /></div>
+            <p id="target-error" class="field-error" hidden></p>
           </div>
           <div class="field">
             <label for="part-cost">Part cost</label>
@@ -52,13 +64,35 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
               <label for="cash"><input id="cash" type="radio" name="payment" value="cash" /><span>Cash</span></label>
             </div>
           </fieldset>
+          <div id="discount-fields" class="extra-fields">
+            <div class="field">
+              <label for="discount">Discount <span>optional, before tax</span></label>
+              <div class="discount-input">
+                <select id="discount-kind" aria-label="Discount type"><option value="amount">$ amount</option><option value="percent">% percent</option></select>
+                <div class="money-field"><input id="discount" name="discount" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" aria-describedby="discount-error" spellcheck="false" /></div>
+              </div>
+              <p id="discount-error" class="field-error" hidden></p>
+            </div>
+          </div>
+          <div class="field labor-field">
+            <label for="labor-minutes">Labor minutes <span>optional</span></label>
+            <div class="money-field"><input id="labor-minutes" name="labor-minutes" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 45" aria-describedby="labor-error labor-note" spellcheck="false" /></div>
+            <p id="labor-error" class="field-error" hidden></p>
+            <p id="labor-note" class="field-note">For profit per hour. No labor cost is subtracted.</p>
+          </div>
         </form>
         <p id="rates-note" class="rates-note"></p>
       </section>
       <section class="results-panel" aria-labelledby="results-heading">
+        <div id="target-result" class="target-result" aria-live="polite" hidden>
+          <h3>Lowest repair price <span>before tax</span></h3>
+          <output id="suggested-price" for="target-profit part-cost screen-repair card cash">—</output>
+          <p id="nice-price"></p>
+          <p id="target-boundary"></p>
+        </div>
         <div class="profit-card" aria-live="polite" aria-atomic="true">
           <div class="profit-heading"><h2 id="results-heading">Net profit</h2><span id="profit-status" class="profit-badge">Ready to calculate</span></div>
-          <output id="profit" for="price part-cost screen-repair card cash" aria-label="Net profit">—</output>
+          <output id="profit" for="price target-profit part-cost screen-repair card cash discount discount-kind" aria-label="Net profit">—</output>
           <p id="margin">Your take-home profit before overhead</p>
         </div>
         <div class="breakdown">
@@ -70,7 +104,10 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
             <div class="breakdown-row"><dt>Part cost</dt><dd id="part-value">—</dd></div>
             <div class="breakdown-row"><dt>Card fee <span id="card-detail"></span></dt><dd id="card-value">—</dd></div>
             <div class="breakdown-row"><dt>Screen warranty <span id="warranty-detail"></span></dt><dd id="warranty-value">—</dd></div>
+            <div class="breakdown-row"><dt>Profit per hour</dt><dd id="hourly-value">—</dd></div>
           </dl>
+          <p id="discount-comparison" class="comparison-note" hidden></p>
+          <p id="discount-tier" class="comparison-note" hidden></p>
           <p class="tax-note">Sales tax is collected for the state and excluded from profit.</p>
         </div>
         <p id="input-status" class="input-status" role="status">Enter a repair price to see your profit.</p>
@@ -104,10 +141,20 @@ const priceInput = element<HTMLInputElement>('price');
 const partInput = element<HTMLInputElement>('part-cost');
 const screenInput = element<HTMLInputElement>('screen-repair');
 const cardInput = element<HTMLInputElement>('card');
+const targetMode = element<HTMLInputElement>('target-mode');
+const targetInput = element<HTMLInputElement>('target-profit');
+const discountInput = element<HTMLInputElement>('discount');
+const discountKind = element<HTMLSelectElement>('discount-kind');
+const laborInput = element<HTMLInputElement>('labor-minutes');
 const fields = ['price-value', 'tax-value', 'total-value', 'part-value', 'card-value', 'warranty-value'];
 const percent = (bps: number): string => `${bps / 100}%`;
 
 let config: ShopConfig = loadSettings();
+function resetTarget(): void {
+  targetInput.value = (config.defaultTargetProfit / 100).toFixed(2);
+  targetInput.defaultValue = targetInput.value;
+}
+resetTarget();
 function updateRates(): void {
   element('rates-note').textContent = `Shop rates: ${percent(config.salesTaxBps)} sales tax · ${percent(config.cardFeeBps)} + ${formatMoney(config.cardFixedFee)} card fee on the total after tax.`;
   element('tax-label').textContent = `Sales tax · ${percent(config.salesTaxBps)}`;
@@ -143,7 +190,7 @@ function showResult(result: TicketResult): void {
   element('profit').textContent = formatMoney(result.netProfit);
   element('profit-status').textContent = loss ? 'Loss' : 'After repair costs';
   element('profit').closest('.profit-card')!.classList.toggle('is-loss', loss);
-  element('margin').textContent = `${((result.margin ?? 0) * 100).toFixed(1)}% margin · before overhead`;
+  element('margin').textContent = result.margin === null ? 'Margin — · before overhead' : `${(result.margin * 100).toFixed(1)}% margin · before overhead`;
   const values = [result.price, result.tax, result.ticketTotal, result.partCost, result.cardFee, result.warranty];
   fields.forEach((id, index) => { element(id).textContent = formatMoney(values[index]); });
   element('card-detail').textContent = cardInput.checked ? `${percent(config.cardFeeBps)} + ${formatMoney(config.cardFixedFee)}` : 'cash · no fee';
@@ -177,31 +224,80 @@ function clearResult(message: string): void {
   element('warranty-detail').textContent = '';
   element('cliff-hint').hidden = true;
   element('tier-limit').hidden = true;
+  element('target-result').hidden = true;
+  element('hourly-value').textContent = '—';
+  element('discount-comparison').hidden = true;
+  element('discount-tier').hidden = true;
   element('input-status').textContent = message;
   element('input-status').hidden = false;
 }
 
 function update(): void {
-  const price = parseMoney(priceInput.value);
+  const isTarget = targetMode.checked;
+  element('price-field').hidden = isTarget;
+  element('target-field').hidden = !isTarget;
+  element('discount-fields').hidden = isTarget;
+  element('target-result').hidden = true;
+  element('discount-comparison').hidden = true;
+  element('discount-tier').hidden = true;
+  const price = parseMoney(isTarget ? targetInput.value : priceInput.value);
   const part = parseMoney(partInput.value);
+  const discount = parseMoney(discountInput.value.trim() || '0');
+  const labor = parseMoney(laborInput.value.trim() || '0');
   // An untouched or cleared price is the useful empty state, not an error.
-  setError(priceInput, 'price-error', priceInput.value ? price.error : undefined);
+  setError(priceInput, 'price-error', !isTarget && priceInput.value ? price.error : undefined);
+  setError(targetInput, 'target-error', isTarget ? price.error : undefined);
   setError(partInput, 'part-error', part.error);
-  if (price.cents === undefined || part.cents === undefined) {
-    clearResult(!priceInput.value ? 'Enter a repair price to see your profit.' : 'Check the amounts to see your profit.');
+  let discountError = discount.error && discountKind.value === 'percent'
+    ? 'Enter a percentage from 0 to 100, with up to two decimal places.' : discount.error;
+  if (discount.cents !== undefined && price.cents !== undefined && discount.cents > (discountKind.value === 'percent' ? 10_000 : price.cents)) {
+    discountError = discountKind.value === 'percent' ? 'Discount cannot exceed 100%.' : 'Discount cannot exceed the repair price.';
+  }
+  setError(discountInput, 'discount-error', isTarget ? undefined : discountError);
+  setError(laborInput, 'labor-error', labor.error ? 'Enter minutes from 0 to 999,999.99, with up to two decimal places.' : undefined);
+  if (price.cents === undefined || part.cents === undefined || (!isTarget && discountError)) {
+    clearResult(!isTarget && !priceInput.value ? 'Enter a repair price to see your profit.' : 'Check the amounts to see your profit.');
     return;
   }
-  if (price.cents === 0) {
+  if (!isTarget && price.cents === 0) {
     clearResult('Enter a repair price above $0.00 to see your profit.');
     return;
   }
-  const result = calculateTicket({ price: price.cents, partCost: part.cents, screenRepair: screenInput.checked, payment: cardInput.checked ? 'card' : 'cash' }, config);
+  const shared = { partCost: part.cents, screenRepair: screenInput.checked, payment: cardInput.checked ? 'card' as const : 'cash' as const };
+  let result: TicketResult;
+  if (isTarget) {
+    const suggestion = findTargetPrice({ ...shared, targetProfit: price.cents }, config);
+    if (!suggestion) { clearResult('This target cannot be reached at a repair price up to $999,999.99 with the current costs and fees.'); return; }
+    result = suggestion.minimum;
+    element('target-result').hidden = false;
+    element('suggested-price').textContent = formatMoney(result.price);
+    element('nice-price').textContent = suggestion.nice
+      ? `Nice price: ${formatMoney(suggestion.nice.price)} before tax · profit ${formatMoney(suggestion.nice.netProfit)}${suggestion.nice.netProfit < price.cents ? ' · below target after the warranty increase' : ''}`
+      : 'No .99 price is available within the price limit.';
+    const previous = suggestion.previousTierMaxPrice;
+    element('target-boundary').hidden = previous === null;
+    element('target-boundary').textContent = previous === null ? ''
+      : `Warranty boundary: tier ${result.warrantyTierIndex! + 1} starts above ${formatMoney(previous)} before tax. The suggested price is ${formatMoney(result.price - previous)} above that boundary.`;
+  } else {
+    const discounted = calculateDiscountedTicket({ ...shared, price: price.cents }, { kind: discountKind.value as 'amount' | 'percent', value: discount.cents! }, config);
+    result = discounted.ticket;
+    if (discounted.discountAmount > 0) {
+      element('discount-comparison').hidden = false;
+      const impact = discounted.profitCost >= 0 ? `Discount costs you ${formatMoney(discounted.profitCost)}` : `Discount increases profit by ${formatMoney(-discounted.profitCost)}`;
+      element('discount-comparison').textContent = `Profit without discount: ${formatMoney(discounted.original.netProfit)}. With discount: ${formatMoney(result.netProfit)}. ${impact} (${formatMoney(discounted.discountAmount)} off the repair price).`;
+      element('discount-tier').hidden = !discounted.cheaperWarrantyTier;
+      element('discount-tier').textContent = `Discount moves the ticket into a cheaper warranty tier: tier ${discounted.original.warrantyTierIndex! + 1} → tier ${result.warrantyTierIndex! + 1}, saving ${formatMoney(discounted.original.warranty - result.warranty)} in warranty cost.`;
+    }
+  }
   showResult(result);
+  const hourly = labor.cents === undefined ? null : calculateProfitPerHour(result.netProfit, labor.cents);
+  element('hourly-value').textContent = hourly === null ? '—' : `${formatMoney(hourly)}/hr`;
   element('input-status').hidden = true;
 }
 
 setupSettings(element('settings-panel'), element<HTMLButtonElement>('settings-toggle'), config, (next) => {
   config = next;
+  resetTarget();
   updateRates();
   update();
 }, DEFAULT_CONFIG);

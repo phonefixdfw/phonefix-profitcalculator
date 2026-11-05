@@ -14,11 +14,12 @@ async function checksum(payload: string): Promise<string> {
   return base64url(new Uint8Array(digest).slice(0, 12));
 }
 
-/** v1 contains only shop settings. Unknown versions must never be partially imported. */
+/** v2 includes the saved target profit. Older versions must never be partially imported. */
 export async function encodeSettingsCode(config: ShopConfig): Promise<string> {
-  if (!isStoredConfig(config)) throw new Error('Save valid settings before sharing.');
+  if (!isStoredConfig(config) || config.defaultTargetProfit === undefined) throw new Error('Save valid settings before sharing.');
   const payload = base64url(new TextEncoder().encode(JSON.stringify({
-    v: 1,
+    v: 2,
+    target: config.defaultTargetProfit,
     rates: [config.salesTaxBps, config.cardFeeBps, config.cardFixedFee],
     tiers: config.warrantyTiers.map(({ min, max, cost }) => [min, max, cost]),
   })));
@@ -39,14 +40,15 @@ export async function decodeSettingsCode(raw: string): Promise<ShopConfig> {
   } catch { throw new Error(INVALID_CODE); }
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(INVALID_CODE);
   const data = value as Record<string, unknown>;
-  if (data.v !== 1) throw new Error('This settings code uses an unsupported version. Create a new code in the current app.');
-  if (Object.keys(data).sort().join(',') !== 'rates,tiers,v' || !Array.isArray(data.rates) || data.rates.length !== 3 || !Array.isArray(data.tiers) || !data.tiers.every((tier) => Array.isArray(tier) && tier.length === 3)) throw new Error(INVALID_CODE);
+  if (data.v !== 2) throw new Error('This settings code uses an unsupported version. Create a new code in the current app.');
+  if (Object.keys(data).sort().join(',') !== 'rates,target,tiers,v' || !Array.isArray(data.rates) || data.rates.length !== 3 || !Array.isArray(data.tiers) || !data.tiers.every((tier) => Array.isArray(tier) && tier.length === 3)) throw new Error(INVALID_CODE);
   const config = {
     salesTaxBps: data.rates[0], cardFeeBps: data.rates[1], cardFixedFee: data.rates[2],
+    defaultTargetProfit: data.target,
     warrantyTiers: data.tiers.map(([min, max, cost]: unknown[]) => ({ min, max, cost })),
   };
-  if (!isStoredConfig(config)) throw new Error('The code contains invalid rates or warranty tiers. Nothing was changed.');
-  return config;
+  if (!isStoredConfig(config) || config.defaultTargetProfit === undefined) throw new Error('The code contains invalid rates, target profit or warranty tiers. Nothing was changed.');
+  return { ...config, defaultTargetProfit: config.defaultTargetProfit };
 }
 
 export function settingsShareLink(code: string): string {

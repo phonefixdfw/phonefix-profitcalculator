@@ -10,7 +10,7 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; }
-button, input, textarea { font: inherit; }
+button, input, select, textarea { font: inherit; }
 button, a, input, label { -webkit-tap-highlight-color: transparent; }
 button, input { accent-color: #245c48; }
 a { color: inherit; }
@@ -169,3 +169,17 @@ footer { display: flex; justify-content: space-between; gap: 14px; font-size: 10
   .settings-rates { grid-template-columns: minmax(0, 1fr); }
   .tier-fields { grid-template-columns: minmax(0, 1fr); }
 }
+
+.calculator-mode { margin: 0 0 24px; }
+.calculator-mode .payment-options label { padding: 10px; text-align: center; line-height: 1.4; font-size: 12px; }
+.extra-fields, .labor-field { margin-top: 24px; }
+.labor-field { margin-bottom: 0; }
+.discount-input { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; }
+.discount-input select { max-width: 100%; min-width: 0; border: 1px solid #cfd8ca; border-radius: 9px; padding: 8px; color: #203c2f; background: #fcfdfb; }
+.field-note, .comparison-note { font-size: 12px; line-height: 1.6; color: #596d51; margin: 8px 0 0; }
+.comparison-note { background: #e9eee2; border-radius: 9px; padding: 12px; margin-top: 16px; }
+.target-result { padding: 22px 24px; margin-bottom: 18px; border: 1px solid #cbd9bc; border-radius: 16px; background: #eef3e7; }
+.target-result h3 { font-size: 14px; }
+.target-result h3 span { font-size: 11px; font-weight: 400; color: #627067; }
+#suggested-price { display: block; font-size: 38px; font-weight: 650; letter-spacing: -1px; margin-top: 10px; overflow-wrap: anywhere; }
+.target-result p { font-size: 12px; line-height: 1.7; margin: 10px 0 0; }

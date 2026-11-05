@@ -19,6 +19,7 @@ test('copies saved settings, renders a local QR and imports into a fresh browser
   await page.getByLabel('Sales tax rate (%)').fill('10');
   await page.getByLabel('Card fee (%)').fill('3');
   await page.getByLabel('Fixed card fee ($)').fill('0.50');
+  await page.getByLabel('Default target profit ($)').fill('91.23');
   await page.getByRole('group', { name: 'Tier 1', exact: true }).getByLabel('Warranty cost ($)').fill('20');
   await page.getByRole('group', { name: 'Tier 2', exact: true }).getByLabel('Warranty cost ($)').fill('25');
   await page.getByRole('button', { name: 'Save settings', exact: true }).click();
@@ -45,6 +46,7 @@ test('copies saved settings, renders a local QR and imports into a fresh browser
     await expect(dialog).toContainText('$0.00 → $0.50');
     await expect(dialog).toContainText('$15.26 → $0.00–$99.99: $20.00');
     await expect(dialog).toContainText('Target profit');
+    await expect(dialog).toContainText('$80.00 → $91.23');
     expect(await other.evaluate(() => localStorage.getItem('phonefix-settings'))).toBeNull();
     expect(await other.evaluate(() => location.hash)).toBe('');
     expect(await other.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -59,6 +61,10 @@ test('copies saved settings, renders a local QR and imports into a fresh browser
     await expect(other.getByLabel('Sales tax rate (%)')).toHaveValue('10.00');
     await expect(other.getByLabel('Card fee (%)')).toHaveValue('3.00');
     await expect(other.getByLabel('Fixed card fee ($)')).toHaveValue('0.50');
+    await expect(other.getByLabel('Default target profit ($)')).toHaveValue('91.23');
+    await other.getByRole('button', { name: 'Settings', exact: true }).click();
+    await other.getByLabel('What should I charge?').check();
+    await expect(other.getByLabel('Target profit', { exact: true })).toHaveValue('91.23');
     expect(otherObserved).toEqual({ errors: [], external: [] });
   } finally { await fresh.close(); }
   expect(observed).toEqual({ errors: [], external: [] });
