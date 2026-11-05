@@ -17,7 +17,7 @@ export default defineConfig({
     { name: 'phone', use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium' } },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: 'npm run preview',
     url: `http://127.0.0.1:${port}`,
     env: { PORT: String(port) },
     reuseExistingServer: !process.env.CI,

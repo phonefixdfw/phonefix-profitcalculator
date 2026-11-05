@@ -4,6 +4,7 @@ import { DEFAULT_CONFIG, type ShopConfig } from './config';
 import { setupSettings } from './settings-ui';
 import { loadSettings } from './settings';
 import { formatMoney, parseMoney } from './money';
+import { setupPwa } from './pwa';
 
 const phoneIcon = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3" stroke="currentColor" stroke-width="1.6"/><path d="M10 18h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 
@@ -212,3 +213,4 @@ element('clear').addEventListener('click', () => {
   priceInput.focus();
 });
 update();
+void setupPwa();

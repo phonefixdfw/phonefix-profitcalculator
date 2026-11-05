@@ -66,7 +66,7 @@ export function validateSettings(draft: SettingsDraft): SettingsValidation {
   return { errors, config: { salesTaxBps, cardFeeBps, cardFixedFee, warrantyTiers: tiers } };
 }
 
-function isStoredConfig(value: unknown): value is ShopConfig {
+export function isStoredConfig(value: unknown): value is ShopConfig {
   if (!value || typeof value !== 'object') return false;
   const config = value as Record<string, unknown>;
   const validInt = (n: unknown, max: number) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 && n <= max;

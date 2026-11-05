@@ -1,5 +1,6 @@
 import type { ShopConfig } from './config';
 import { draftFromConfig, resetSettings, saveSettings, validateSettings, type SettingsDraft } from './settings';
+import { setupSettingsTransfer } from './settings-transfer-ui';
 
 export function setupSettings(panel: HTMLElement, toggle: HTMLButtonElement, initial: ShopConfig, onSave: (config: ShopConfig) => void, defaults: ShopConfig): void {
   let current = initial;
@@ -7,6 +8,7 @@ export function setupSettings(panel: HTMLElement, toggle: HTMLButtonElement, ini
   panel.innerHTML = `
     <div class="panel-heading"><div><p class="eyebrow">SHOP RATES</p><h2 id="settings-heading">Settings</h2></div></div>
     <p class="settings-help">Changes are saved on this browser and apply to the calculator. Enter amounts in dollars; tier bounds include both endpoints.</p>
+    <section id="settings-transfer" class="settings-transfer" aria-label="Share shop settings"></section>
     <form id="settings-form" novalidate>
       <div class="settings-rates">
         <div class="settings-field"><label for="settings-tax">Sales tax rate (%)</label><input id="settings-tax" data-key="salesTax" type="text" inputmode="decimal" aria-describedby="error-salesTax"><p class="field-error" id="error-salesTax" hidden></p></div>
@@ -91,4 +93,10 @@ export function setupSettings(panel: HTMLElement, toggle: HTMLButtonElement, ini
     current = defaults; draft = draftFromConfig(current); render(); onSave(current); status.textContent = 'Default settings restored.';
   });
   render();
+  setupSettingsTransfer(panel.querySelector<HTMLElement>('#settings-transfer')!, () => current, (config) => {
+    if (!saveSettings(config)) return false;
+    current = config; draft = draftFromConfig(current); render(); onSave(current);
+    status.textContent = '';
+    return true;
+  }, () => { if (panel.hidden) toggle.click(); });
 }
