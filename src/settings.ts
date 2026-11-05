@@ -71,7 +71,7 @@ export function validateSettings(draft: SettingsDraft): SettingsValidation {
 
 type StoredConfig = Omit<ShopConfig, 'defaultTargetProfit'> & { defaultTargetProfit?: number };
 
-function isStoredConfig(value: unknown): value is StoredConfig {
+export function isStoredConfig(value: unknown): value is StoredConfig {
   if (!value || typeof value !== 'object') return false;
   const config = value as Record<string, unknown>;
   const validInt = (n: unknown, max: number) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 && n <= max;

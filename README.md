@@ -13,7 +13,7 @@ npm run dev
 PORT=5795 npm run dev
 ```
 
-The dev server listens on all interfaces; the default port is 5173. `PORT` is read in `vite.config.ts`.
+The dev server listens on all interfaces; the default port is 5173. `PORT` is read in `vite.config.ts`. Both dev and preview allow the shop's LAN hostname `taint`, the current machine's hostname, localhost and IP addresses, and fail if the requested port is occupied.
 
 ```sh
 npm run build       # TypeScript check, then static files in dist/
@@ -23,7 +23,15 @@ npx playwright install chromium
 npm run test:e2e    # Desktop Chromium and 390px phone smoke tests
 ```
 
-Run `npm run build` before the e2e suite, which also checks the generated search-engine directives in `dist/`. Playwright starts the dev server on port 5795 (or `PORT`) and stops it afterward; locally it can reuse an existing server. CI installs Chromium and runs build, unit tests and browser tests. Deploy the contents of `dist/` to a static host.
+Both dev and preview respect `PORT`; preview defaults to 4173. Run `npm run build` before the e2e suite. Playwright serves the production build on port 5795 (or `PORT`) and stops it afterward; locally it can reuse an existing preview server. The suite checks search-engine directives, installation, offline use, updates and settings transfer on desktop and a 390px phone. CI installs Chromium and runs build, unit tests and browser tests. Deploy the contents of `dist/` to a static host.
+
+## Install and use offline
+
+Visit `https://calc.phone-fix.com/` once while connected and let the page finish loading. Use the browser's **Install app** / **Add to Home Screen** menu to install on a phone or desktop. The production service worker precaches all built app files, including the locally bundled QR generator, manifest and icons. The app then opens and calculates without an internet connection. Settings still live in each browser's localStorage; clearing site data removes both settings and the offline cache.
+
+Every production build generates a service worker with a content-based cache revision. On the next connected load it checks for a deploy; **Updated, reload** activates the downloaded update and reloads when convenient. Closing all app windows also lets a waiting update activate for the next launch. Old app caches are removed after activation; saved settings are retained. The app registers the worker only in production builds. When switching a preview origin to development, Vite serves a temporary cleanup worker at `/sw.js`: even a cached production page can update to it, remove only the app's precaches, unregister and reload controlled tabs into development. Saved settings and unrelated caches are retained. Serve over HTTPS (localhost also works); the host should revalidate `/sw.js` rather than cache it immutably.
+
+The app icons are original calculator/phone artwork in `public/app-icon.svg`. To regenerate the committed PNGs after editing the artwork, install Playwright Chromium and run `node scripts/generate-icons.mjs`. The maskable version uses the same artwork inside its central safe area.
 
 ## Search engines
 
@@ -75,6 +83,10 @@ Open **Warranty tiers** below the calculator for a quick reference showing every
 ## Shop settings
 
 Open **Settings** from the calculator to edit the default target profit, tax rate, card percentage and fixed fee, and screen-warranty tiers. Save applies changes to the current ticket immediately and stores them in this browser's localStorage. Settings are specific to the browser and device; clearing site data removes them. Missing, invalid, or corrupt saved settings fall back to the defaults in `src/config.ts`. If browser storage is unavailable, the app reports that saving failed.
+
+To copy settings between devices, save any edits, then choose **Copy settings code**. It copies a text code and shows a QR code for `https://calc.phone-fix.com/#settings=<code>`. QR generation runs locally, without external requests. If clipboard access is unavailable, select and copy the displayed code manually. Scan the QR on the other device or paste the code into **Load settings code** and choose **Review settings code**. Review the current and incoming rates and every tier, then choose **Confirm and save settings**. Cancel or Escape leaves settings unchanged. Invalid, damaged or unsupported codes cannot change settings, and the import fragment is removed from the address bar as soon as it is read.
+
+Transfer format v2 is `PF.<base64url JSON>.<checksum>`, with `{ v: 2, target: defaultTargetProfitCents, rates: [taxBps, cardBps, fixedFeeCents], tiers: [[minCents, maxCentsOrNull, costCents], ...] }`. The checksum is the first 12 bytes of SHA-256 of the encoded payload, encoded as base64url. It detects accidental corruption, not who created a code; confirmation remains required. Strict version, shape, integer, amount and tier validation prevents partial imports. Codes are limited to 20,000 characters; lists too large for a QR can still be copied as text. This version includes all shop settings, including the saved target profit. Saved repairs stay on this browser and are not included in settings codes. Older v1 codes without target profit, unknown versions and extra fields are rejected with a request to create a new code in the current app.
 
 Enter percentages and dollar amounts with up to two decimal places. Rates must be non-negative and at most 10,000%; amounts are capped at $999,999.99. Tier endpoints are inclusive: start at $0.00, put each next tier one cent above the preceding upper bound, and leave only the final upper bound blank for “and up”. Add or remove rows as needed. Invalid settings show inline errors and cannot be saved. **Reset to defaults** asks for confirmation, clears saved settings, and immediately restores the shop defaults.
 

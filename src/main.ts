@@ -7,6 +7,7 @@ import { formatMoney, parseMoney } from './money';
 import { setupTabs } from './tabs';
 import { setupSavedRepairs } from './saved-repairs-ui';
 import { formatQuote, setupQuote } from './quote';
+import { setupPwa } from './pwa';
 
 const phoneIcon = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3" stroke="currentColor" stroke-width="1.6"/><path d="M10 18h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 
@@ -355,3 +356,4 @@ element('save-current-repair').addEventListener('click', () => {
     screenRepair: screenInput.checked, laborMinutes: laborInput.value });
 });
 update();
+void setupPwa();
