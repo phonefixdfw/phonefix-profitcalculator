@@ -9,6 +9,7 @@ export interface ShopConfig {
   readonly salesTaxBps: number;
   readonly cardFeeBps: number;
   readonly cardFixedFee: number;
+  readonly defaultTargetProfit: number;
   readonly warrantyTiers: readonly WarrantyTier[];
 }
 
@@ -17,6 +18,7 @@ export const DEFAULT_CONFIG: ShopConfig = {
   salesTaxBps: 825,
   cardFeeBps: 200,
   cardFixedFee: 0,
+  defaultTargetProfit: 8_000,
   warrantyTiers: [
     { min: 0, max: 9_999, cost: 1_526 },
     { min: 10_000, max: 14_999, cost: 2_189 },

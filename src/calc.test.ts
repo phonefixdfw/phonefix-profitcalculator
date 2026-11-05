@@ -186,6 +186,7 @@ describe('rounding, input safety and configurable rates', () => {
   it('accepts custom rates, a fixed fee and custom tiers without mutating inputs', () => {
     const config: ShopConfig = Object.freeze({
       salesTaxBps: 1_000, cardFeeBps: 250, cardFixedFee: 30,
+      defaultTargetProfit: 8_000,
       warrantyTiers: Object.freeze([{ min: 0, max: 9_999, cost: 500 }, { min: 10_000, max: null, cost: 1_000 }]),
     });
     const input: TicketInput = Object.freeze({ price: 9_100, partCost: 2_000, payment: 'card', screenRepair: true });

@@ -9,6 +9,7 @@ export interface SettingsDraft {
   salesTax: string;
   cardFee: string;
   cardFixedFee: string;
+  defaultTargetProfit: string;
   tiers: { min: string; max: string; cost: string }[];
 }
 
@@ -22,6 +23,7 @@ export function draftFromConfig(config: ShopConfig): SettingsDraft {
   return {
     salesTax: decimal(config.salesTaxBps), cardFee: decimal(config.cardFeeBps),
     cardFixedFee: decimal(config.cardFixedFee),
+    defaultTargetProfit: decimal(config.defaultTargetProfit),
     tiers: config.warrantyTiers.map(({ min, max, cost }) => ({
       min: decimal(min), max: max === null ? '' : decimal(max), cost: decimal(cost),
     })),
@@ -45,6 +47,7 @@ export function validateSettings(draft: SettingsDraft): SettingsValidation {
   const salesTaxBps = amount('salesTax', draft.salesTax, true);
   const cardFeeBps = amount('cardFee', draft.cardFee, true);
   const cardFixedFee = amount('cardFixedFee', draft.cardFixedFee);
+  const defaultTargetProfit = amount('defaultTargetProfit', draft.defaultTargetProfit);
   const tiers: WarrantyTier[] = [];
   if (!draft.tiers.length) errors.tiers = 'Add at least one warranty tier, starting at $0.00 and ending with an open upper bound.';
   draft.tiers.forEach((tier, index) => {
@@ -62,14 +65,17 @@ export function validateSettings(draft: SettingsDraft): SettingsValidation {
     // Preserve indexes while validating other rows, even if this row is incomplete.
     tiers.push({ min: min ?? 0, max: max ?? null, cost: cost ?? 0 });
   });
-  if (Object.keys(errors).length || salesTaxBps === undefined || cardFeeBps === undefined || cardFixedFee === undefined) return { errors };
-  return { errors, config: { salesTaxBps, cardFeeBps, cardFixedFee, warrantyTiers: tiers } };
+  if (Object.keys(errors).length || salesTaxBps === undefined || cardFeeBps === undefined || cardFixedFee === undefined || defaultTargetProfit === undefined) return { errors };
+  return { errors, config: { salesTaxBps, cardFeeBps, cardFixedFee, defaultTargetProfit, warrantyTiers: tiers } };
 }
 
-function isStoredConfig(value: unknown): value is ShopConfig {
+type StoredConfig = Omit<ShopConfig, 'defaultTargetProfit'> & { defaultTargetProfit?: number };
+
+function isStoredConfig(value: unknown): value is StoredConfig {
   if (!value || typeof value !== 'object') return false;
   const config = value as Record<string, unknown>;
   const validInt = (n: unknown, max: number) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 && n <= max;
+  if (config.defaultTargetProfit !== undefined && !validInt(config.defaultTargetProfit, MAX_MONEY_CENTS)) return false;
   if (!validInt(config.salesTaxBps, MAX_RATE_BPS) || !validInt(config.cardFeeBps, MAX_RATE_BPS) || !validInt(config.cardFixedFee, MAX_MONEY_CENTS) || !Array.isArray(config.warrantyTiers) || !config.warrantyTiers.length) return false;
   return config.warrantyTiers.every((tier: unknown, index: number, tiers: unknown[]) => {
     if (!tier || typeof tier !== 'object') return false;
@@ -85,7 +91,8 @@ export function loadSettings(): ShopConfig {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) {
       const value: unknown = JSON.parse(raw);
-      if (isStoredConfig(value)) return value;
+      // Older saved settings predate target pricing; keep their rates and tiers.
+      if (isStoredConfig(value)) return { ...value, defaultTargetProfit: value.defaultTargetProfit ?? DEFAULT_CONFIG.defaultTargetProfit };
     }
   } catch { /* Storage may be unavailable or malformed. */ }
   return DEFAULT_CONFIG;
