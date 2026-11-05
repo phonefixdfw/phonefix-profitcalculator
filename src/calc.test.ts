@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyRate, calculateTicket, findWarrantyTier, highestPriceForTotal, type TicketInput } from './calc';
+import { applyRate, calculateTicket, findWarrantyTier, getWarrantyTierReference, highestPriceForTotal, type TicketInput } from './calc';
 import { DEFAULT_CONFIG, type ShopConfig } from './config';
 import { MAX_MONEY_CENTS } from './money';
 
@@ -82,6 +82,47 @@ const priceCaps = [
   [29_999, 27_713], [34_999, 32_332], [39_999, 36_951], [44_999, 41_569],
   [49_999, 46_188], [54_999, 50_807], [59_999, 55_426],
 ] as const;
+
+describe('warranty tier quick reference', () => {
+  it.each(priceCaps)('shows the hand-worked max price for ticket cap %i', (max, expectedPrice) => {
+    const index = DEFAULT_CONFIG.warrantyTiers.findIndex((tier) => tier.max === max);
+    const row = getWarrantyTierReference()[index];
+    expect(row).toEqual({ ...DEFAULT_CONFIG.warrantyTiers[index], maxRepairPrice: expectedPrice });
+    expect(ticket(row.maxRepairPrice!).warrantyTierIndex).toBe(index);
+    expect(ticket(row.maxRepairPrice! + 1).warrantyTierIndex).toBe(index + 1);
+  });
+
+  it('leaves the open-ended tier without a maximum repair price', () => {
+    expect(getWarrantyTierReference().at(-1)).toEqual({ min: 60_000, max: null, cost: 8_818, maxRepairPrice: null });
+  });
+
+  it('uses changed sales tax settings, including half-cent rounding', () => {
+    const config = { ...DEFAULT_CONFIG, salesTaxBps: 1_000 };
+    const rows = getWarrantyTierReference(config);
+    // $90.90 + $9.09 = $99.99; $136.35 + $13.64 = $149.99;
+    // $181.81 + $18.18 = $199.99. The next cent reaches the next tier.
+    expect(rows.slice(0, 3).map((row) => row.maxRepairPrice)).toEqual([9_090, 13_635, 18_181]);
+    rows.slice(0, -1).forEach((row, index) => {
+      const input: TicketInput = { price: row.maxRepairPrice!, partCost: 0, payment: 'cash', screenRepair: true };
+      expect(calculateTicket(input, config).warrantyTierIndex).toBe(index);
+      expect(calculateTicket({ ...input, price: input.price + 1 }, config).warrantyTierIndex).toBe(index + 1);
+    });
+    expect(getWarrantyTierReference({ ...config, salesTaxBps: 0 })[0].maxRepairPrice).toBe(9_999);
+  });
+
+  it('follows an edited tier table and the same tax rounding when totals are skipped', () => {
+    const config: ShopConfig = {
+      ...DEFAULT_CONFIG, salesTaxBps: 5_000,
+      warrantyTiers: [{ min: 0, max: 4, cost: 1 }, { min: 5, max: null, cost: 2 }],
+    };
+    expect(getWarrantyTierReference(config)).toEqual([
+      { min: 0, max: 4, cost: 1, maxRepairPrice: 2 },
+      { min: 5, max: null, cost: 2, maxRepairPrice: null },
+    ]);
+    expect(calculateTicket({ price: 2, partCost: 0, payment: 'cash', screenRepair: true }, config).ticketTotal).toBe(3);
+    expect(calculateTicket({ price: 3, partCost: 0, payment: 'cash', screenRepair: true }, config).warrantyTierIndex).toBe(1);
+  });
+});
 
 describe('warranty price limits and tier-cliff hints', () => {
   it.each(priceCaps)('finds the highest pre-tax price under total %i', (totalCap, priceCap) => {
