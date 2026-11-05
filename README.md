@@ -67,13 +67,32 @@ Open **Warranty tiers** below the calculator for a quick reference showing every
 ## Counter behavior and input limits
 
 - Default to a screen repair paid by card, with $0 parts. Clear restores these defaults and focuses the blank price for the next ticket.
-- Enter dollars and up to two decimal places, without currency signs, commas or exponent notation. Negative, blank, malformed or excessive amounts show a short message and clear the result. A zero price shows a prompt instead of a misleading negative warranty-only profit.
+- Enter dollars and up to two decimal places, without currency signs, commas or exponent notation. Negative, blank, malformed or excessive amounts show a short message and clear the result. A zero entered repair price shows a prompt. A positive price discounted to zero shows the actual loss, including parts, warranty and any fixed card fee.
 - Price and parts are each capped at **$999,999.99** to reject accidental huge input and keep the counter UI readable. The pure engine accepts zero cents but rejects negative, fractional, non-finite and over-limit monetary inputs.
 - Losses show a red result and a “Loss” label. The margin is rounded to one decimal place for display.
 - The layout supports desktop and phone widths with labeled decimal inputs and keyboard-accessible controls. Live results do not move focus.
 
 ## Shop settings
 
-Open **Settings** from the calculator to edit the tax rate, card percentage and fixed fee, and screen-warranty tiers. Save applies changes to the current ticket immediately and stores them in this browser's localStorage. Settings are specific to the browser and device; clearing site data removes them. Missing, invalid, or corrupt saved settings fall back to the defaults in `src/config.ts`. If browser storage is unavailable, the app reports that saving failed.
+Open **Settings** from the calculator to edit the default target profit, tax rate, card percentage and fixed fee, and screen-warranty tiers. Save applies changes to the current ticket immediately and stores them in this browser's localStorage. Settings are specific to the browser and device; clearing site data removes them. Missing, invalid, or corrupt saved settings fall back to the defaults in `src/config.ts`. If browser storage is unavailable, the app reports that saving failed.
 
 Enter percentages and dollar amounts with up to two decimal places. Rates must be non-negative and at most 10,000%; amounts are capped at $999,999.99. Tier endpoints are inclusive: start at $0.00, put each next tier one cent above the preceding upper bound, and leave only the final upper bound blank for “and up”. Add or remove rows as needed. Invalid settings show inline errors and cannot be saved. **Reset to defaults** asks for confirmation, clears saved settings, and immediately restores the shop defaults.
+
+## Target-profit pricing, discounts and labor time
+
+Choose **What should I charge?** to enter a target profit with the same part cost, screen-repair and payment controls. The default target is **$80.00**, editable in Settings. Saving or resetting settings applies that default to the target field; Clear restores it. Older saved settings retain their rates and tiers and gain the $80 default.
+
+`findTargetPrice` in `src/calc.ts` returns the **lowest pre-tax cent price** meeting the target, with a full `calculateTicket` breakdown. It searches each warranty tier separately, in price order. Exact integer bounds narrow the usual cent search. For unusual rates near or above a 100% effective card fee, a bounded search of 10,000 tax-rounding residues solves the exact half-up inequality. It does not assume profit is monotonic, even within a tier. Every suggested result is verified by `calculateTicket`. Targets that cannot be reached within the $999,999.99 price limit show a message.
+
+The **nice price** is the first price at or above the minimum ending in .99. Its actual profit is shown, including a warning if crossing a warranty cliff puts it below the target. A boundary note shows how far a suggested price sits above the preceding tier's highest repair price.
+
+Hand check with the default settings, screen warranty, card payment, $50 parts and $80 target:
+
+- $162.03 × 8.25% = $13.367475 → **$13.37** tax, total **$175.40**.
+- $175.40 × 2% = $3.508 → **$3.51** fee; warranty tier 3 costs **$28.52**.
+- $162.03 − $50 − $3.51 − $28.52 = **$80.00** profit.
+- At $162.02, tax and fees remain the same, so profit is **$79.99**.
+
+In **Profit from a price** mode, the optional discount accepts a dollar amount or a percentage with up to two decimal places. Percent discounts round half-up to cents before subtraction. Tax, ticket total, card fee, warranty tier and margin use the discounted price. The result compares profit with and without the discount and flags warranty savings. For example, discounting $93 by $0.63 moves the total from $100.67 to $99.99: the warranty falls from $21.89 to $15.26, and profit **increases $6.01**. Discounts must be nonnegative and cannot exceed the price or 100%; an empty discount means zero.
+
+Optional **labor minutes** works in both modes. It accepts up to two decimal places, from zero to 999,999.99 minutes. `calculateProfitPerHour` takes integer hundredths of a minute and rounds the final hourly profit to cents, half-up (away from zero on a loss). $80 over 45 minutes is **$106.67/hr**. Empty or zero time displays “—”; invalid time shows an inline error and hides the hourly result. Labor time never subtracts a cost or changes the ticket's profit.
