@@ -10,7 +10,7 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; }
-button, input, select { font: inherit; }
+button, input, select, textarea { font: inherit; }
 button, a, input, label { -webkit-tap-highlight-color: transparent; }
 button, input { accent-color: #245c48; }
 a { color: inherit; }
@@ -145,6 +145,25 @@ footer { display: flex; justify-content: space-between; gap: 14px; font-size: 10
 .primary-button { min-height: 44px; padding: 10px 18px; border: 1px solid #153f36; border-radius: 8px; color: #fff; background: #153f36; cursor: pointer; }
 .primary-button:hover { background: #245c48; }
 .settings-status { font-size: 13px; line-height: 1.5; color: #395c48; margin: 12px 0 0; }
+.settings-transfer { border: 1px solid #e0e5da; border-radius: 10px; padding: 18px; margin: 20px 0; }
+.settings-transfer h3 { font-size: 16px; }
+.settings-transfer form, #settings-export { margin-top: 18px; }
+.settings-transfer .settings-field { margin-bottom: 12px; }
+.settings-transfer textarea { width: 100%; min-width: 0; resize: vertical; padding: 10px; border: 1px solid #cfd8ca; border-radius: 8px; color: #203c2f; background: #fcfdfb; overflow-wrap: anywhere; font-size: 13px; }
+.settings-transfer textarea[aria-invalid="true"] { border-color: #b34b45; }
+#settings-export-code { font-family: ui-monospace, monospace; }
+#settings-qr svg { display: block; width: 100%; max-width: 320px; height: auto; margin: 14px 0; }
+#settings-share-link { font-size: 13px; overflow-wrap: anywhere; }
+#settings-import-dialog { width: min(640px, calc(100% - 24px)); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 24px; border: 1px solid #cfd8ca; border-radius: 14px; color: #203c2f; }
+#settings-import-dialog::backdrop { background: #153f3699; }
+#settings-import-dialog h2 { font-size: 21px; }
+#settings-import-tiers { font-size: 12px; line-height: 1.7; }
+#settings-import-tiers ol { padding-left: 22px; }
+#settings-import-dialog .breakdown-row { gap: 12px; }
+#settings-import-dialog dd { max-width: 65%; }
+.app-update { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); width: min(460px, calc(100% - 32px)); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: #fff; border: 1px solid #cfd8ca; border-radius: 12px; box-shadow: 0 4px 22px #153f3626; z-index: 10; }
+.app-update p { margin: 0; font-size: 13px; }
+.app-update button { flex-shrink: 0; }
 @media (max-width: 700px) {
   .settings-panel { padding: 20px; }
   .settings-rates { grid-template-columns: minmax(0, 1fr); }
