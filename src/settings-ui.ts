@@ -12,6 +12,7 @@ export function setupSettings(panel: HTMLElement, toggle: HTMLButtonElement, ini
         <div class="settings-field"><label for="settings-tax">Sales tax rate (%)</label><input id="settings-tax" data-key="salesTax" type="text" inputmode="decimal" aria-describedby="error-salesTax"><p class="field-error" id="error-salesTax" hidden></p></div>
         <div class="settings-field"><label for="settings-card">Card fee (%)</label><input id="settings-card" data-key="cardFee" type="text" inputmode="decimal" aria-describedby="error-cardFee"><p class="field-error" id="error-cardFee" hidden></p></div>
         <div class="settings-field"><label for="settings-fixed">Fixed card fee ($)</label><input id="settings-fixed" data-key="cardFixedFee" type="text" inputmode="decimal" aria-describedby="error-cardFixedFee"><p class="field-error" id="error-cardFixedFee" hidden></p></div>
+        <div class="settings-field"><label for="settings-target">Default target profit ($)</label><input id="settings-target" data-key="defaultTargetProfit" type="text" inputmode="decimal" aria-describedby="error-defaultTargetProfit"><p class="field-error" id="error-defaultTargetProfit" hidden></p></div>
       </div>
       <div class="settings-tier-heading"><h3>Screen warranty tiers</h3><p>Based on the ticket total after tax. Leave the last upper bound blank for “and up”.</p></div>
       <p id="error-tiers" class="field-error" hidden></p><div id="settings-tiers"></div>
@@ -27,6 +28,7 @@ export function setupSettings(panel: HTMLElement, toggle: HTMLButtonElement, ini
   function readDraft(): SettingsDraft {
     return {
       salesTax: input('salesTax').value, cardFee: input('cardFee').value, cardFixedFee: input('cardFixedFee').value,
+      defaultTargetProfit: input('defaultTargetProfit').value,
       tiers: Array.from(tiers.querySelectorAll<HTMLElement>('.tier-row')).map((row) => ({
         min: row.querySelector<HTMLInputElement>('[data-part="min"]')!.value,
         max: row.querySelector<HTMLInputElement>('[data-part="max"]')!.value,
@@ -38,6 +40,7 @@ export function setupSettings(panel: HTMLElement, toggle: HTMLButtonElement, ini
     input('salesTax').value = draft.salesTax;
     input('cardFee').value = draft.cardFee;
     input('cardFixedFee').value = draft.cardFixedFee;
+    input('defaultTargetProfit').value = draft.defaultTargetProfit;
     tiers.innerHTML = '';
     draft.tiers.forEach((tier, index) => {
       const row = document.createElement('fieldset');
