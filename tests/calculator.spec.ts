@@ -100,3 +100,75 @@ test('handles invalid, empty, zero and huge amounts without stale results or ove
   await expect(page.locator('#tier-limit')).toContainText('highest warranty tier');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+
+test('saves settings, applies them immediately, and restores them after reload', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('Repair price before tax').fill('91');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByLabel('Sales tax rate (%)').fill('10');
+  await page.getByLabel('Card fee (%)').fill('3');
+  await page.getByLabel('Fixed card fee ($)').fill('0.50');
+  await page.getByRole('group', { name: 'Tier 2' }).getByLabel('Warranty cost ($)').fill('25');
+  await page.getByRole('button', { name: 'Save settings' }).click();
+  await expect(page.getByText('Settings saved and applied.')).toBeVisible();
+  await expect(page.locator('#tax-value')).toHaveText('$9.10');
+  await expect(page.locator('#card-value')).toHaveText('$3.50');
+  await expect(page.locator('#warranty-value')).toHaveText('$25.00');
+  await expect(page.locator('#warranty-detail')).toContainText('tier 2');
+  await expect(page.locator('#profit')).toHaveText('$62.50');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.reload();
+  await page.getByLabel('Repair price before tax').fill('91');
+  await expect(page.locator('#profit')).toHaveText('$62.50');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByLabel('Sales tax rate (%)')).toHaveValue('10.00');
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Reset to defaults' }).click();
+  await expect(page.locator('#profit')).toHaveText('$73.77');
+  await page.reload();
+  await page.getByLabel('Repair price before tax').fill('91');
+  await expect(page.locator('#profit')).toHaveText('$73.77');
+});
+
+test('rejects invalid tiers and falls back from corrupt stored settings', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => localStorage.setItem('phonefix-settings', '{broken'));
+  await page.reload();
+  await page.getByLabel('Repair price before tax').fill('91');
+  await expect(page.locator('#profit')).toHaveText('$73.77');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const tier = page.getByRole('group', { name: 'Tier 2' });
+  await tier.getByLabel('From ($)').fill('101');
+  await page.getByRole('button', { name: 'Save settings' }).click();
+  await expect(tier.getByText(/There is a gap/)).toBeVisible();
+  await tier.getByLabel('From ($)').fill('99.99');
+  await page.getByRole('button', { name: 'Save settings' }).click();
+  await expect(tier.getByText(/Tiers overlap/)).toBeVisible();
+  await tier.getByLabel('From ($)').fill('100');
+  await tier.getByLabel('Warranty cost ($)').fill('-1');
+  await page.getByRole('button', { name: 'Save settings' }).click();
+  await expect(tier.getByText(/\$0.00 or more/)).toBeVisible();
+  await tier.getByLabel('Warranty cost ($)').fill('');
+  await page.getByRole('button', { name: 'Save settings' }).click();
+  await expect(tier.getByText('Enter an amount.')).toBeVisible();
+  await expect(page.locator('#profit')).toHaveText('$73.77');
+  expect(await page.evaluate(() => localStorage.getItem('phonefix-settings'))).toBe('{broken');
+});
+
+test('edits warranty rows and supports keyboard access', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Settings', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByLabel('Sales tax rate (%)')).toBeFocused();
+  await page.getByRole('button', { name: 'Add tier' }).click();
+  await expect(page.getByRole('group', { name: 'Tier 13' }).getByLabel('From ($)')).toBeFocused();
+  await page.getByRole('button', { name: 'Save settings' }).click();
+  await expect(page.getByRole('group', { name: 'Tier 12' }).getByText(/Only the last tier/)).toBeVisible();
+  await page.getByRole('button', { name: 'Remove tier 13' }).click();
+  await expect(page.getByRole('button', { name: 'Add tier' })).toBeFocused();
+  await page.getByRole('button', { name: 'Save settings' }).click();
+  await expect(page.getByText('Settings saved and applied.')).toBeVisible();
+  page.once('dialog', (dialog) => dialog.dismiss());
+  await page.getByRole('button', { name: 'Reset to defaults' }).click();
+  await expect(page.getByText('Settings saved and applied.')).toBeVisible();
+});

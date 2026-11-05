@@ -1,6 +1,6 @@
 # PhoneFix DFW repair profit calculator
 
-A small, static Vite + TypeScript app for pricing one repair at the shop counter. Runs entirely in the browser, with no backend, tracking, external fonts, or application network requests. Nothing is saved or sent. An editable settings screen is follow-up issue #2.
+A small, static Vite + TypeScript app for pricing one repair at the shop counter. Runs entirely in the browser, with no backend, tracking, external fonts, or application network requests. Shop settings are saved in this browser; no data is sent.
 
 ## Run
 
@@ -31,7 +31,7 @@ The owner's real rates live in **`src/config.ts`**, in `DEFAULT_CONFIG`: 8.25% s
 
 Warranty tiers are an ordered list of `{ min, max, cost }` in cents. Both bounds are inclusive; only the last tier has `max: null` (no upper limit). Tier selection uses the **tax-included ticket total**. Screen repairs include the shop-paid 1-year accidental damage warranty; other repairs have no warranty charge.
 
-`calculateTicket(input, config = DEFAULT_CONFIG)` in **`src/calc.ts`** is pure and accepts custom `ShopConfig` values so the settings screen can supply saved rates later. Custom configs must have nonnegative integer basis-point rates, cent amounts, and contiguous ordered tiers covering zero upward.
+`calculateTicket(input, config = DEFAULT_CONFIG)` in **`src/calc.ts`** is pure and accepts custom `ShopConfig` values and receives the saved settings from the settings screen. Custom configs must have nonnegative integer basis-point rates, cent amounts, and contiguous ordered tiers covering zero upward.
 
 ## Calculation order and rounding
 
@@ -65,3 +65,9 @@ It also returns the highest pre-tax price for the current tier, even when no low
 - Price and parts are each capped at **$999,999.99** to reject accidental huge input and keep the counter UI readable. The pure engine accepts zero cents but rejects negative, fractional, non-finite and over-limit monetary inputs.
 - Losses show a red result and a “Loss” label. The margin is rounded to one decimal place for display.
 - The layout supports desktop and phone widths with labeled decimal inputs and keyboard-accessible controls. Live results do not move focus.
+
+## Shop settings
+
+Open **Settings** from the calculator to edit the tax rate, card percentage and fixed fee, and screen-warranty tiers. Save applies changes to the current ticket immediately and stores them in this browser's localStorage. Settings are specific to the browser and device; clearing site data removes them. Missing, invalid, or corrupt saved settings fall back to the defaults in `src/config.ts`. If browser storage is unavailable, the app reports that saving failed.
+
+Enter percentages and dollar amounts with up to two decimal places. Rates must be non-negative and at most 10,000%; amounts are capped at $999,999.99. Tier endpoints are inclusive: start at $0.00, put each next tier one cent above the preceding upper bound, and leave only the final upper bound blank for “and up”. Add or remove rows as needed. Invalid settings show inline errors and cannot be saved. **Reset to defaults** asks for confirmation, clears saved settings, and immediately restores the shop defaults.
