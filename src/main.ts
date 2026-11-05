@@ -117,7 +117,7 @@ function showResult(result: TicketResult): void {
   element('cliff-hint').hidden = !hint;
   if (hint) {
     const comparison = hint.gain === 0 ? 'the same profit as' : `${formatMoney(hint.gain)} more than`;
-    element('cliff-copy').textContent = `Charging ${formatMoney(hint.price)} or less keeps the warranty at ${formatMoney(hint.warranty)}. At ${formatMoney(hint.price)}, you'd make ${comparison} at ${formatMoney(result.price)}.`;
+    element('cliff-copy').textContent = `At ${formatMoney(hint.price)}, the warranty costs ${formatMoney(hint.warranty)}. You'd make ${comparison} at ${formatMoney(result.price)}.`;
     element('cliff-profit').textContent = `Net profit at ${formatMoney(hint.price)}: ${formatMoney(hint.profit)}`;
   }
   element('tier-limit').hidden = !result.warrantyPricing;

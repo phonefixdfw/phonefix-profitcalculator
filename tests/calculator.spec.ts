@@ -19,7 +19,7 @@ test('calculates live, shows tier hints, and resets for the next ticket', async 
   await page.getByLabel('Repair price before tax').fill('93');
   await expect(page.locator('#profit')).toHaveText('$69.10');
   await expect(page.locator('#total-value')).toHaveText('$100.67');
-  await expect(page.locator('#cliff-hint')).toContainText('Charging $92.37 or less');
+  await expect(page.locator('#cliff-copy')).toHaveText("At $92.37, the warranty costs $15.26. You'd make $6.01 more than at $93.00.");
   await expect(page.locator('#cliff-hint')).toContainText('$6.01 more');
   await expect(page.locator('#tier-limit')).toContainText('$138.56');
 
@@ -50,6 +50,30 @@ test('calculates live, shows tier hints, and resets for the next ticket', async 
   await expect(page.locator('#profit')).toHaveText('—');
   expect(errors).toEqual([]);
   expect(externalRequests).toEqual([]);
+});
+
+test('ties higher-tier warranty suggestions to the exact suggested price', async ({ page }) => {
+  await page.goto('/');
+  const price = page.getByLabel('Repair price before tax');
+
+  await price.fill('139');
+  await expect(page.locator('#warranty-value')).toHaveText('$28.52');
+  await expect(page.locator('#cliff-hint')).toBeVisible();
+  await expect(page.locator('#cliff-copy')).toHaveText("At $138.56, the warranty costs $21.89. You'd make $6.20 more than at $139.00.");
+  await expect(page.locator('#cliff-profit')).toHaveText('Net profit at $138.56: $113.67');
+
+  await price.fill('138.56');
+  await expect(page.locator('#total-value')).toHaveText('$149.99');
+  await expect(page.locator('#warranty-value')).toHaveText('$21.89');
+  await expect(page.locator('#profit')).toHaveText('$113.67');
+  await expect(page.locator('#cliff-hint')).toBeHidden();
+
+  // Below tier 2's lower boundary, the warranty is cheaper than at the suggested price.
+  await price.fill('90');
+  await expect(page.locator('#total-value')).toHaveText('$97.43');
+  await expect(page.locator('#warranty-value')).toHaveText('$15.26');
+  await expect(page.locator('#warranty-detail')).toContainText('tier 1');
+  await expect(page.locator('#cliff-hint')).toBeHidden();
 });
 
 test('handles invalid, empty, zero and huge amounts without stale results or overflow', async ({ page }) => {
