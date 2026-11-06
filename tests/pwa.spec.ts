@@ -17,7 +17,7 @@ test('has an installable manifest, correctly sized icons and a controlling servi
   expect(manifest).toMatchObject({
     name: 'PhoneFix Profit Calculator', short_name: 'Profit Calc',
     start_url: '/', scope: '/', display: 'standalone',
-    theme_color: '#153f36', background_color: '#f5f6f2',
+    theme_color: '#00787d', background_color: '#fafbf7',
   });
   expect(manifest.icons.map((icon: { purpose: string }) => icon.purpose)).toContain('maskable');
   for (const icon of manifest.icons) {
