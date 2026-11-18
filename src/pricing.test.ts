@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateDiscountedTicket, calculateProfitPerHour, calculateTicket, findTargetPrice, type TargetProfitInput } from './calc';
+import { calculateDiscountedTicket, calculateProfitPerHour, calculateTicket, dropTierMaxShortfall, findTargetPrice, type TargetProfitInput } from './calc';
 import { DEFAULT_CONFIG } from './config';
 import { MAX_MONEY_CENTS } from './money';
 
@@ -153,18 +153,41 @@ describe('top-of-tier recommendation', () => {
     expect(result.nextTierWarrantyIncrease).toBe(663);
   });
 
-  it('explains the step-up when the target lands just over a tier boundary', () => {
-    // Tier 1 tops out at $92.37 for $75.11; a $75.12 target is one cent short.
-    const result = findTargetPrice({ ...target, partCost: 0, targetProfit: 7_512 })!;
-    expect(result.minimum.warrantyTierIndex).toBe(1);
-    expect(result.previousTierMaxPrice).toBe(9_237);
-    expect(result.lowerTierNearMiss).toEqual({
-      price: 9_237, profit: 7_511, shortfall: 1, warrantyIncrease: 663, extraRevenue: result.minimum.price - 9_237,
+  describe('drop-a-tier note', () => {
+    // Default rates, card, no parts: tier 1 tops out at $92.37 for $75.11; tier 2 costs $6.63 more.
+    const card = { partCost: 0, screenRepair: true, payment: 'card' as const };
+    const at = (targetProfit: number, config = DEFAULT_CONFIG) => findTargetPrice({ ...card, targetProfit }, config)!;
+
+    it('computes the allowed shortfall from the warranty difference', () => {
+      expect(dropTierMaxShortfall(2_189, 1_526)).toBe(663);
+      expect(dropTierMaxShortfall(1_000, 1_000)).toBe(0);
+      expect(dropTierMaxShortfall(500, 1_000)).toBe(0);
     });
-    // Tier 2 tops out at $138.56 (total $149.99).
-    expect(result.topOfTier).toMatchObject({ price: 13_856, ticketTotal: 14_999, warranty: 2_189 });
-    // No near miss when the lower tier is far short of the target.
-    expect(findTargetPrice(target)!.lowerTierNearMiss).toBeNull();
+
+    it('fires at default rates when the lower tier misses the target by less than the warranty step', () => {
+      const result = at(7_650);
+      expect(result.minimum).toMatchObject({ price: 10_057, warrantyTierIndex: 1, netProfit: 7_650 });
+      expect(result.previousTierMaxPrice).toBe(9_237);
+      expect(result.dropTier).toEqual({ price: 9_237, profit: 7_511, shortfall: 139, warrantySaved: 663 });
+      expect(result.dropTier!.profit).toBeLessThan(result.minimum.netProfit);
+    });
+
+    it('is hidden when the lower tier clearly earns less', () => {
+      expect(at(8_200).minimum.warrantyTierIndex).toBe(1);
+      expect(at(8_200).dropTier).toBeNull();
+      expect(findTargetPrice(target)!.dropTier).toBeNull();
+    });
+
+    it('is shown at exactly the warranty step and hidden one cent beyond it', () => {
+      // $75.11 + $6.63 = $81.74 target is exactly one step above the lower tier's profit.
+      expect(at(7_511 + 663).dropTier).toMatchObject({ shortfall: 663 });
+      expect(at(7_511 + 664).dropTier).toBeNull();
+    });
+
+    it('is hidden in tier 1, where there is nothing to drop to', () => {
+      expect(at(5_000).dropTier).toBeNull();
+      expect(at(7_511).dropTier).toBeNull();
+    });
   });
 
   it('gives no recommendation in the open-ended top tier', () => {
@@ -178,7 +201,7 @@ describe('top-of-tier recommendation', () => {
     const result = findTargetPrice({ ...target, screenRepair: false })!;
     expect(result.topOfTier).toBeNull();
     expect(result.nextTierWarrantyIncrease).toBeNull();
-    expect(result.lowerTierNearMiss).toBeNull();
+    expect(result.dropTier).toBeNull();
     expect(result.previousTierMaxPrice).toBeNull();
   });
 

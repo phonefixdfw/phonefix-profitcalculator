@@ -189,24 +189,33 @@ export interface TargetPriceResult {
   /** Extra warranty cost of the next tier up; null when warranty is off or there is none. */
   readonly nextTierWarrantyIncrease: number | null;
   /**
-   * Set when the minimum is in tier 2+ and the preceding tier's top price falls
-   * short of the target by no more than NEAR_BOUNDARY_SHORTFALL cents.
+   * Set when the minimum is in tier 2+ and the preceding tier's top price misses
+   * the target by no more than the warranty-cost difference between the two
+   * tiers (see dropTierMaxShortfall). A lower tier that meets the target would
+   * already have been the minimum, so shortfall is always positive here.
    */
-  readonly lowerTierNearMiss: LowerTierNearMiss | null;
+  readonly dropTier: DropTierOption | null;
 }
 
-export interface LowerTierNearMiss {
+export interface DropTierOption {
+  /** Top price of the preceding tier (pre-tax). */
   readonly price: number;
+  /** Net profit at that price. */
   readonly profit: number;
+  /** Cents the profit falls short of the target; 0 when it meets it. */
   readonly shortfall: number;
-  /** Warranty cost added by the higher tier. */
-  readonly warrantyIncrease: number;
-  /** Extra pre-tax price the target price needs over the lower tier's top price. */
-  readonly extraRevenue: number;
+  /** Warranty cost saved by the lower tier. */
+  readonly warrantySaved: number;
 }
 
-/** "Nearly reaches" the target: the lower tier's best price is within $5.00. */
-export const NEAR_BOUNDARY_SHORTFALL = 500;
+/**
+ * How far below the target the lower tier's top price may fall and still be
+ * worth showing: the warranty it saves. Both costs are integer cents, so the
+ * difference is exact (no rounding applies).
+ */
+export function dropTierMaxShortfall(upperTierCost: number, lowerTierCost: number): number {
+  return Math.max(0, upperTierCost - lowerTierCost);
+}
 
 function floorDivide(n: bigint, positiveDivisor: bigint): bigint {
   const quotient = n / positiveDivisor;
@@ -270,7 +279,7 @@ export function findTargetPrice(input: TargetProfitInput, config: ShopConfig = D
       const index = minimum.warrantyTierIndex;
       let topOfTier: TicketResult | null = null;
       let nextTierWarrantyIncrease: number | null = null;
-      let lowerTierNearMiss: LowerTierNearMiss | null = null;
+      let dropTier: DropTierOption | null = null;
       if (index !== null) {
         const tiers = config.warrantyTiers;
         if (tiers[index].max !== null) {
@@ -284,13 +293,10 @@ export function findTargetPrice(input: TargetProfitInput, config: ShopConfig = D
         if (index > 0) {
           const lowerTop = highestPriceForTotal(tiers[index - 1].max!, config.salesTaxBps);
           const lower = calculateTicket({ ...input, price: lowerTop }, config);
-          const shortfall = input.targetProfit - lower.netProfit;
-          if (shortfall > 0 && shortfall <= NEAR_BOUNDARY_SHORTFALL) {
-            lowerTierNearMiss = {
-              price: lowerTop, profit: lower.netProfit, shortfall,
-              warrantyIncrease: tiers[index].cost - tiers[index - 1].cost,
-              extraRevenue: minimum.price - lowerTop,
-            };
+          const shortfall = Math.max(0, input.targetProfit - lower.netProfit);
+          const saved = tiers[index].cost - tiers[index - 1].cost;
+          if (shortfall <= dropTierMaxShortfall(tiers[index].cost, tiers[index - 1].cost)) {
+            dropTier = { price: lowerTop, profit: lower.netProfit, shortfall, warrantySaved: saved };
           }
         }
       }
@@ -299,7 +305,7 @@ export function findTargetPrice(input: TargetProfitInput, config: ShopConfig = D
         nice: nicePrice <= MAX_MONEY_CENTS ? calculateTicket({ ...input, price: nicePrice }, config) : null,
         previousTierMaxPrice: index !== null && index > 0
           ? highestPriceForTotal(config.warrantyTiers[index - 1].max!, config.salesTaxBps) : null,
-        topOfTier, nextTierWarrantyIncrease, lowerTierNearMiss,
+        topOfTier, nextTierWarrantyIncrease, dropTier,
       };
     }
     low = high + 1;
