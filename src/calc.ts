@@ -180,7 +180,33 @@ export interface TargetPriceResult {
   /** null if the next .99 price exceeds the counter's price limit. */
   readonly nice: TicketResult | null;
   readonly previousTierMaxPrice: number | null;
+  /**
+   * Screen repairs only: the highest pre-tax price whose tax-included total
+   * stays in the minimum's warranty tier, so the warranty cost is unchanged.
+   * null when the warranty is off or the tier is open-ended (no cap).
+   */
+  readonly topOfTier: TicketResult | null;
+  /** Extra warranty cost of the next tier up; null when warranty is off or there is none. */
+  readonly nextTierWarrantyIncrease: number | null;
+  /**
+   * Set when the minimum is in tier 2+ and the preceding tier's top price falls
+   * short of the target by no more than NEAR_BOUNDARY_SHORTFALL cents.
+   */
+  readonly lowerTierNearMiss: LowerTierNearMiss | null;
 }
+
+export interface LowerTierNearMiss {
+  readonly price: number;
+  readonly profit: number;
+  readonly shortfall: number;
+  /** Warranty cost added by the higher tier. */
+  readonly warrantyIncrease: number;
+  /** Extra pre-tax price the target price needs over the lower tier's top price. */
+  readonly extraRevenue: number;
+}
+
+/** "Nearly reaches" the target: the lower tier's best price is within $5.00. */
+export const NEAR_BOUNDARY_SHORTFALL = 500;
 
 function floorDivide(n: bigint, positiveDivisor: bigint): bigint {
   const quotient = n / positiveDivisor;
@@ -242,11 +268,38 @@ export function findTargetPrice(input: TargetProfitInput, config: ShopConfig = D
       if (minimum.netProfit < input.targetProfit) throw new Error('Target price verification failed.');
       const nicePrice = Math.floor(best / 100) * 100 + 99;
       const index = minimum.warrantyTierIndex;
+      let topOfTier: TicketResult | null = null;
+      let nextTierWarrantyIncrease: number | null = null;
+      let lowerTierNearMiss: LowerTierNearMiss | null = null;
+      if (index !== null) {
+        const tiers = config.warrantyTiers;
+        if (tiers[index].max !== null) {
+          const topPrice = Math.min(MAX_MONEY_CENTS, highestPriceForTotal(tiers[index].max, config.salesTaxBps));
+          topOfTier = calculateTicket({ ...input, price: topPrice }, config);
+          if (topOfTier.warrantyTierIndex !== index || topOfTier.ticketTotal > tiers[index].max) {
+            throw new Error('Top-of-tier verification failed.');
+          }
+        }
+        if (index + 1 < tiers.length) nextTierWarrantyIncrease = tiers[index + 1].cost - tiers[index].cost;
+        if (index > 0) {
+          const lowerTop = highestPriceForTotal(tiers[index - 1].max!, config.salesTaxBps);
+          const lower = calculateTicket({ ...input, price: lowerTop }, config);
+          const shortfall = input.targetProfit - lower.netProfit;
+          if (shortfall > 0 && shortfall <= NEAR_BOUNDARY_SHORTFALL) {
+            lowerTierNearMiss = {
+              price: lowerTop, profit: lower.netProfit, shortfall,
+              warrantyIncrease: tiers[index].cost - tiers[index - 1].cost,
+              extraRevenue: minimum.price - lowerTop,
+            };
+          }
+        }
+      }
       return {
         minimum,
         nice: nicePrice <= MAX_MONEY_CENTS ? calculateTicket({ ...input, price: nicePrice }, config) : null,
         previousTierMaxPrice: index !== null && index > 0
           ? highestPriceForTotal(config.warrantyTiers[index - 1].max!, config.salesTaxBps) : null,
+        topOfTier, nextTierWarrantyIncrease, lowerTierNearMiss,
       };
     }
     low = high + 1;

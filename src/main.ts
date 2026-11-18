@@ -95,8 +95,13 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       </section>
       <section class="results-panel" aria-labelledby="results-heading">
         <div id="target-result" class="target-result" aria-live="polite" hidden>
-          <h3>Lowest repair price <span>before tax</span></h3>
+          <h3>Lowest price that hits target <span>before tax</span></h3>
           <output id="suggested-price" for="target-profit part-cost screen-repair card cash">—</output>
+          <div id="top-of-tier" hidden>
+            <h3>Recommended: top of tier <span>before tax</span></h3>
+            <output id="top-of-tier-price">—</output>
+            <p id="top-of-tier-note"></p>
+          </div>
           <p id="nice-price"></p>
           <p id="target-boundary"></p>
         </div>
@@ -311,12 +316,32 @@ function update(): void {
     element('target-result').hidden = false;
     element('suggested-price').textContent = formatMoney(result.price);
     element('nice-price').textContent = suggestion.nice
-      ? `Nice price: ${formatMoney(suggestion.nice.price)} before tax · profit ${formatMoney(suggestion.nice.netProfit)}${suggestion.nice.netProfit < price.cents ? ' · below target after the warranty increase' : ''}`
+      ? `Nice price: ${formatMoney(suggestion.nice.price)} before tax · profit ${formatMoney(suggestion.nice.netProfit)}${suggestion.nice.netProfit < price.cents ? ' · below target after the warranty increase' : suggestion.nice.warranty > result.warranty ? ` · moves to a costlier warranty tier (+${formatMoney(suggestion.nice.warranty - result.warranty)})` : ''}`
       : 'No .99 price is available within the price limit.';
+    const top = suggestion.topOfTier;
+    const showTop = result.warrantyTierIndex !== null;
+    element('top-of-tier').hidden = !showTop;
+    if (showTop) {
+      if (!top) {
+        element('top-of-tier-price').textContent = 'None';
+        element('top-of-tier-note').textContent = `Tier ${result.warrantyTierIndex! + 1} is the open-ended top tier, so there is no cap to price up to and no top-of-tier recommendation.`;
+      } else {
+        const extra = top.netProfit - result.netProfit;
+        element('top-of-tier-price').textContent = formatMoney(top.price);
+        const next = suggestion.nextTierWarrantyIncrease;
+        element('top-of-tier-note').textContent = top.price === result.price
+          ? `The lowest price is already the top of tier ${result.warrantyTierIndex! + 1}. Going higher steps into a tier with ${next === null ? 'a higher' : `a ${formatMoney(next)} higher`} warranty cost.`
+          : `Total ${formatMoney(top.ticketTotal)} with tax, still in tier ${result.warrantyTierIndex! + 1}: warranty cost unchanged at ${formatMoney(top.warranty)}. Adds ${formatMoney(extra)} profit (${formatMoney(top.netProfit)} total) over the lowest price.`;
+      }
+    }
     const previous = suggestion.previousTierMaxPrice;
     element('target-boundary').hidden = previous === null;
     element('target-boundary').textContent = previous === null ? ''
       : `Warranty boundary: tier ${result.warrantyTierIndex! + 1} starts above ${formatMoney(previous)} before tax. The suggested price is ${formatMoney(result.price - previous)} above that boundary.`;
+    const near = suggestion.lowerTierNearMiss;
+    if (near) {
+      element('target-boundary').textContent += ` The lower tier tops out at ${formatMoney(near.price)} for ${formatMoney(near.profit)} profit, ${formatMoney(near.shortfall)} short of the target. Stepping up adds ${formatMoney(near.warrantyIncrease)} warranty cost for ${formatMoney(near.extraRevenue)} more price.`;
+    }
   } else {
     const discounted = calculateDiscountedTicket({ ...shared, price: price.cents }, { kind: discountKind.value as 'amount' | 'percent', value: discount.cents! }, config);
     result = discounted.ticket;

@@ -133,3 +133,67 @@ describe('profit per hour, without a labor cost', () => {
     expect(() => calculateProfitPerHour(NaN, 100)).toThrow(RangeError);
   });
 });
+
+describe('top-of-tier recommendation', () => {
+  it('recommends the highest price in the tier when the target is low in it', () => {
+    // Lowest $162.03 is in tier 3 (total $175.40). $184.75 × 8.25% = 15.241875 → 15.24, total $199.99 (tier max).
+    // Fee 199.99 × 2% = 3.9998 → 4.00; profit 184.75 − 50 − 4.00 − 28.52 = 102.23, i.e. 22.23 more.
+    const result = findTargetPrice(target)!;
+    expect(result.topOfTier).toMatchObject({ price: 18_475, ticketTotal: 19_999, warranty: 2_852, warrantyTierIndex: 2, netProfit: 10_223 });
+    expect(result.topOfTier!.netProfit - result.minimum.netProfit).toBe(2_223);
+    // One more cent would total $200.00 and step into tier 4.
+    expect(calculateTicket({ ...target, price: 18_476 }).warrantyTierIndex).toBe(3);
+    expect(result.nextTierWarrantyIncrease).toBe(663);
+  });
+
+  it('adds nothing when the lowest price is exactly the top of its tier', () => {
+    const result = findTargetPrice({ ...target, partCost: 0, targetProfit: 7_511 })!;
+    expect(result.minimum.price).toBe(9_237);
+    expect(result.topOfTier).toEqual(result.minimum);
+    expect(result.nextTierWarrantyIncrease).toBe(663);
+  });
+
+  it('explains the step-up when the target lands just over a tier boundary', () => {
+    // Tier 1 tops out at $92.37 for $75.11; a $75.12 target is one cent short.
+    const result = findTargetPrice({ ...target, partCost: 0, targetProfit: 7_512 })!;
+    expect(result.minimum.warrantyTierIndex).toBe(1);
+    expect(result.previousTierMaxPrice).toBe(9_237);
+    expect(result.lowerTierNearMiss).toEqual({
+      price: 9_237, profit: 7_511, shortfall: 1, warrantyIncrease: 663, extraRevenue: result.minimum.price - 9_237,
+    });
+    // Tier 2 tops out at $138.56 (total $149.99).
+    expect(result.topOfTier).toMatchObject({ price: 13_856, ticketTotal: 14_999, warranty: 2_189 });
+    // No near miss when the lower tier is far short of the target.
+    expect(findTargetPrice(target)!.lowerTierNearMiss).toBeNull();
+  });
+
+  it('gives no recommendation in the open-ended top tier', () => {
+    const result = findTargetPrice({ ...target, targetProfit: 50_000 })!;
+    expect(result.minimum.warrantyTierIndex).toBe(DEFAULT_CONFIG.warrantyTiers.length - 1);
+    expect(result.topOfTier).toBeNull();
+    expect(result.nextTierWarrantyIncrease).toBeNull();
+  });
+
+  it('does nothing without the screen warranty', () => {
+    const result = findTargetPrice({ ...target, screenRepair: false })!;
+    expect(result.topOfTier).toBeNull();
+    expect(result.nextTierWarrantyIncrease).toBeNull();
+    expect(result.lowerTierNearMiss).toBeNull();
+    expect(result.previousTierMaxPrice).toBeNull();
+  });
+
+  it('never exceeds the tier max when tax rounding skips totals', () => {
+    // Find a total that no price produces (tax rounding jumps over it).
+    let skipped = 0;
+    const seen = new Set<number>();
+    for (let price = 0; price < 3_000; price++) seen.add(calculateTicket({ ...target, screenRepair: false, price }).ticketTotal);
+    for (let total = 2_999; total > 100; total--) if (!seen.has(total)) { skipped = total; break; }
+    expect(skipped).toBeGreaterThan(0);
+    const config = { ...DEFAULT_CONFIG, warrantyTiers: [{ min: 0, max: skipped, cost: 1_000 }, { min: skipped + 1, max: null, cost: 2_000 }] };
+    const result = findTargetPrice({ partCost: 0, screenRepair: true, payment: 'cash', targetProfit: 1_500 }, config)!;
+    const top = result.topOfTier!;
+    expect(top.ticketTotal).toBeLessThan(skipped);
+    expect(top.warrantyTierIndex).toBe(0);
+    expect(calculateTicket({ ...target, partCost: 0, price: top.price + 1 }, config).warrantyTierIndex).toBe(1);
+  });
+});
