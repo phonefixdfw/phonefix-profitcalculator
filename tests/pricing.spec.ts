@@ -62,6 +62,12 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 900 }, { name: '
     await expect(page.locator('#top-of-tier-note')).toHaveText('Total $199.99 with tax, still tier 3, same warranty. +$22.23 profit.');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
+    await page.getByLabel('Part cost', { exact: true }).fill('0');
+    await page.getByLabel('Target profit', { exact: true }).fill('76.50');
+    await expect(page.locator('#suggested-price')).toHaveText('$100.57');
+    await expect(page.locator('#target-boundary')).toHaveText('Drop a tier? $92.37 earns $75.11 (misses target by $1.39, saves $6.63 warranty) vs $76.50 at $100.57 / $113.67 at $138.56.');
+    await page.getByLabel('Target profit', { exact: true }).fill('82');
+    await expect(page.locator('#target-boundary')).toBeHidden();
     await page.getByLabel('Target profit', { exact: true }).fill('500');
     await expect(page.locator('#top-of-tier-price')).toHaveText('None');
     await expect(page.locator('#top-of-tier-note')).toHaveText('Tier 12 has no cap, so there is no top-of-tier price.');
@@ -71,7 +77,7 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 900 }, { name: '
   });
 }
 
-test('persists and resets the default target, and shows the drop-a-tier note near a boundary', async ({ page }) => {
+test('persists and resets the default target, and hides the drop-a-tier note when the lower tier is no cheaper', async ({ page }) => {
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const defaultTarget = page.getByLabel('Default target profit ($)');
   await defaultTarget.fill('-1');
@@ -84,7 +90,8 @@ test('persists and resets the default target, and shows the drop-a-tier note nea
   await page.getByLabel('What should I charge?').check();
   await expect(page.getByLabel('Target profit', { exact: true })).toHaveValue('80.38');
   await expect(page.locator('#suggested-price')).toHaveText('$92.38');
-  await expect(page.locator('#target-boundary')).toHaveText('Drop a tier? $92.37 earns $75.11 (misses target by $5.27) vs $80.38 at $92.38 / $125.56 at $138.56: the lower price costs more than the warranty saves.');
+  // Tier 2 costs less than tier 1 here, so dropping a tier saves nothing.
+  await expect(page.locator('#target-boundary')).toBeHidden();
   await page.reload();
   await page.getByLabel('What should I charge?').check();
   await expect(page.getByLabel('Target profit', { exact: true })).toHaveValue('80.38');

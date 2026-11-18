@@ -189,8 +189,10 @@ export interface TargetPriceResult {
   /** Extra warranty cost of the next tier up; null when warranty is off or there is none. */
   readonly nextTierWarrantyIncrease: number | null;
   /**
-   * Set when the minimum is in tier 2+ and sits no more than
-   * NEAR_BOUNDARY_WINDOW cents above the preceding tier's top price.
+   * Set when the minimum is in tier 2+ and the preceding tier's top price misses
+   * the target by no more than the warranty-cost difference between the two
+   * tiers (see dropTierMaxShortfall). A lower tier that meets the target would
+   * already have been the minimum, so shortfall is always positive here.
    */
   readonly dropTier: DropTierOption | null;
 }
@@ -202,10 +204,18 @@ export interface DropTierOption {
   readonly profit: number;
   /** Cents the profit falls short of the target; 0 when it meets it. */
   readonly shortfall: number;
+  /** Warranty cost saved by the lower tier. */
+  readonly warrantySaved: number;
 }
 
-/** Show the "Drop a tier?" note when the lowest target price is within $5.00 pre-tax above the lower tier's top price. */
-export const NEAR_BOUNDARY_WINDOW = 500;
+/**
+ * How far below the target the lower tier's top price may fall and still be
+ * worth showing: the warranty it saves. Both costs are integer cents, so the
+ * difference is exact (no rounding applies).
+ */
+export function dropTierMaxShortfall(upperTierCost: number, lowerTierCost: number): number {
+  return Math.max(0, upperTierCost - lowerTierCost);
+}
 
 function floorDivide(n: bigint, positiveDivisor: bigint): bigint {
   const quotient = n / positiveDivisor;
@@ -283,8 +293,10 @@ export function findTargetPrice(input: TargetProfitInput, config: ShopConfig = D
         if (index > 0) {
           const lowerTop = highestPriceForTotal(tiers[index - 1].max!, config.salesTaxBps);
           const lower = calculateTicket({ ...input, price: lowerTop }, config);
-          if (minimum.price - lowerTop <= NEAR_BOUNDARY_WINDOW) {
-            dropTier = { price: lowerTop, profit: lower.netProfit, shortfall: Math.max(0, input.targetProfit - lower.netProfit) };
+          const shortfall = Math.max(0, input.targetProfit - lower.netProfit);
+          const saved = tiers[index].cost - tiers[index - 1].cost;
+          if (shortfall <= dropTierMaxShortfall(tiers[index].cost, tiers[index - 1].cost)) {
+            dropTier = { price: lowerTop, profit: lower.netProfit, shortfall, warrantySaved: saved };
           }
         }
       }

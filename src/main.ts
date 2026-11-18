@@ -342,7 +342,7 @@ function update(): void {
     if (drop) {
       const miss = drop.shortfall > 0 ? `misses target by ${formatMoney(drop.shortfall)}` : 'hits target';
       const rec = top && top.price !== result.price ? ` / ${formatMoney(top.netProfit)} at ${formatMoney(top.price)}` : '';
-      element('target-boundary').textContent = `Drop a tier? ${formatMoney(drop.price)} earns ${formatMoney(drop.profit)} (${miss}) vs ${formatMoney(result.netProfit)} at ${formatMoney(result.price)}${rec}${drop.profit > result.netProfit ? ': cheaper warranty beats the lower price.' : ': the lower price costs more than the warranty saves.'}`;
+      element('target-boundary').textContent = `Drop a tier? ${formatMoney(drop.price)} earns ${formatMoney(drop.profit)} (${miss}, saves ${formatMoney(drop.warrantySaved)} warranty) vs ${formatMoney(result.netProfit)} at ${formatMoney(result.price)}${rec}.`;
     }
   } else {
     const discounted = calculateDiscountedTicket({ ...shared, price: price.cents }, { kind: discountKind.value as 'amount' | 'percent', value: discount.cents! }, config);

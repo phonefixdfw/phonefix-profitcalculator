@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateDiscountedTicket, calculateProfitPerHour, calculateTicket, findTargetPrice, NEAR_BOUNDARY_WINDOW, type TargetProfitInput } from './calc';
+import { calculateDiscountedTicket, calculateProfitPerHour, calculateTicket, dropTierMaxShortfall, findTargetPrice, type TargetProfitInput } from './calc';
 import { DEFAULT_CONFIG } from './config';
 import { MAX_MONEY_CENTS } from './money';
 
@@ -154,45 +154,39 @@ describe('top-of-tier recommendation', () => {
   });
 
   describe('drop-a-tier note', () => {
-    // Cash, no parts, tier 2 costs only $2.00 more than tier 1: tier 1 tops out at $92.37 for $77.11.
-    const cheapStep = {
-      ...DEFAULT_CONFIG,
-      warrantyTiers: DEFAULT_CONFIG.warrantyTiers.map((tier, i) => (i === 1 ? { ...tier, cost: 1_726 } : tier)),
-    };
-    const cash = { partCost: 0, screenRepair: true, payment: 'cash' as const };
-    const at = (targetProfit: number) => findTargetPrice({ ...cash, targetProfit }, cheapStep)!;
+    // Default rates, card, no parts: tier 1 tops out at $92.37 for $75.11; tier 2 costs $6.63 more.
+    const card = { partCost: 0, screenRepair: true, payment: 'card' as const };
+    const at = (targetProfit: number, config = DEFAULT_CONFIG) => findTargetPrice({ ...card, targetProfit }, config)!;
 
-    it('is shown when the lowest price is near the boundary, with the shortfall', () => {
-      const result = at(7_900);
-      expect(result.minimum.price).toBe(9_626);
-      expect(result.minimum.warrantyTierIndex).toBe(1);
+    it('computes the allowed shortfall from the warranty difference', () => {
+      expect(dropTierMaxShortfall(2_189, 1_526)).toBe(663);
+      expect(dropTierMaxShortfall(1_000, 1_000)).toBe(0);
+      expect(dropTierMaxShortfall(500, 1_000)).toBe(0);
+    });
+
+    it('fires at default rates when the lower tier misses the target by less than the warranty step', () => {
+      const result = at(7_650);
+      expect(result.minimum).toMatchObject({ price: 10_057, warrantyTierIndex: 1, netProfit: 7_650 });
       expect(result.previousTierMaxPrice).toBe(9_237);
-      expect(result.dropTier).toEqual({ price: 9_237, profit: 7_711, shortfall: 189 });
+      expect(result.dropTier).toEqual({ price: 9_237, profit: 7_511, shortfall: 139, warrantySaved: 663 });
       expect(result.dropTier!.profit).toBeLessThan(result.minimum.netProfit);
     });
 
-    it('is hidden when the lower tier already meets the target', () => {
-      // Tier 1 meets this target outright, so the minimum stays in tier 1 and there is no note.
-      expect(at(7_711).dropTier).toBeNull();
-    });
-
-    it('is included at exactly the window edge and hidden one cent beyond it', () => {
-      const edge = at(8_011);
-      expect(edge.minimum.price - edge.previousTierMaxPrice!).toBe(NEAR_BOUNDARY_WINDOW);
-      expect(edge.dropTier).not.toBeNull();
-      const beyond = at(8_012);
-      expect(beyond.minimum.price - beyond.previousTierMaxPrice!).toBe(NEAR_BOUNDARY_WINDOW + 1);
-      expect(beyond.dropTier).toBeNull();
-    });
-
-    it('is hidden when the target is far above the boundary, and in tier 1', () => {
-      expect(at(9_000).dropTier).toBeNull();
+    it('is hidden when the lower tier clearly earns less', () => {
+      expect(at(8_200).minimum.warrantyTierIndex).toBe(1);
+      expect(at(8_200).dropTier).toBeNull();
       expect(findTargetPrice(target)!.dropTier).toBeNull();
-      expect(findTargetPrice({ ...target, partCost: 0, targetProfit: 5_000 })!.dropTier).toBeNull();
     });
 
-    it('is hidden at default rates, where one tier step costs more than the window', () => {
-      expect(findTargetPrice({ ...target, partCost: 0, targetProfit: 7_512 })!.dropTier).toBeNull();
+    it('is shown at exactly the warranty step and hidden one cent beyond it', () => {
+      // $75.11 + $6.63 = $81.74 target is exactly one step above the lower tier's profit.
+      expect(at(7_511 + 663).dropTier).toMatchObject({ shortfall: 663 });
+      expect(at(7_511 + 664).dropTier).toBeNull();
+    });
+
+    it('is hidden in tier 1, where there is nothing to drop to', () => {
+      expect(at(5_000).dropTier).toBeNull();
+      expect(at(7_511).dropTier).toBeNull();
     });
   });
 
