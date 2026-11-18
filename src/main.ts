@@ -1,4 +1,5 @@
 import './style.css';
+import { summarizeTarget } from './target-summary';
 import { calculateDiscountedTicket, calculateProfitPerHour, findTargetPrice, getWarrantyTierReference, type TicketResult } from './calc';
 import { DEFAULT_CONFIG, type ShopConfig } from './config';
 import { setupSettings } from './settings-ui';
@@ -321,29 +322,14 @@ function update(): void {
     element('nice-price').hidden = result.warrantyTierIndex !== null && !niceCostlier;
     element('nice-price').textContent = nice === null ? 'No .99 price is available within the price limit.'
       : `Nice price: ${formatMoney(nice.price)} before tax · profit ${formatMoney(nice.netProfit)}${niceCostlier ? ` · costlier warranty tier (+${formatMoney(nice.warranty - result.warranty)})${nice.netProfit < price.cents ? ', below target' : ''}` : ''}`;
-    const top = suggestion.topOfTier;
-    const showTop = result.warrantyTierIndex !== null;
-    element('top-of-tier').hidden = !showTop;
-    if (showTop) {
-      const tier = result.warrantyTierIndex! + 1;
-      if (!top) {
-        element('top-of-tier-price').textContent = 'None';
-        element('top-of-tier-note').textContent = `Tier ${tier} has no cap, so there is no top-of-tier price.`;
-      } else {
-        element('top-of-tier-price').textContent = formatMoney(top.price);
-        const next = suggestion.nextTierWarrantyIncrease;
-        element('top-of-tier-note').textContent = top.price === result.price
-          ? `Already the top of tier ${tier}; the next tier adds ${next === null ? 'warranty cost' : `${formatMoney(next)} warranty`}.`
-          : `Total ${formatMoney(top.ticketTotal)} with tax, still tier ${tier}, same warranty. +${formatMoney(top.netProfit - result.netProfit)} profit.`;
-      }
+    const summary = summarizeTarget(suggestion);
+    element('top-of-tier').hidden = summary.topOfTier === null;
+    if (summary.topOfTier) {
+      element('top-of-tier-price').textContent = summary.topOfTier.price;
+      element('top-of-tier-note').textContent = summary.topOfTier.note;
     }
-    const drop = suggestion.dropTier;
-    element('target-boundary').hidden = drop === null;
-    if (drop) {
-      const miss = drop.shortfall > 0 ? `misses target by ${formatMoney(drop.shortfall)}` : 'hits target';
-      const rec = top && top.price !== result.price ? ` / ${formatMoney(top.netProfit)} at ${formatMoney(top.price)}` : '';
-      element('target-boundary').textContent = `Drop a tier? ${formatMoney(drop.price)} earns ${formatMoney(drop.profit)} (${miss}, saves ${formatMoney(drop.warrantySaved)} warranty) vs ${formatMoney(result.netProfit)} at ${formatMoney(result.price)}${rec}.`;
-    }
+    element('target-boundary').hidden = summary.dropTier === null;
+    if (summary.dropTier) element('target-boundary').textContent = summary.dropTier;
   } else {
     const discounted = calculateDiscountedTicket({ ...shared, price: price.cents }, { kind: discountKind.value as 'amount' | 'percent', value: discount.cents! }, config);
     result = discounted.ticket;

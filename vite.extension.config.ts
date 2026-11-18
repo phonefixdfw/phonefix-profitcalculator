@@ -13,7 +13,11 @@ export default defineConfig({
     emptyOutDir: true,
     target: 'chrome120',
     modulePreload: false,
-    rollupOptions: { input: [resolve('extension/popup.html'), resolve('extension/options.html')] },
+    rollupOptions: {
+      input: { popup: resolve('extension/popup.html'), options: resolve('extension/options.html'), background: resolve('src/extension-background.ts') },
+      // The service worker must keep a fixed name for the manifest.
+      output: { entryFileNames: (chunk) => (chunk.name === 'background' ? 'background.js' : 'assets/[name]-[hash].js') },
+    },
   },
   plugins: [{
     name: 'phonefix-extension-assets',
