@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "PhoneFix Profit Calculator",
+  "version": "1.0.0",
+  "description": "Repair profit with parts, sales tax, card fees and screen warranty costs.",
+  "action": {
+    "default_title": "PhoneFix Profit Calculator",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/app-192.png",
+      "48": "icons/app-192.png",
+      "128": "icons/app-512.png"
+    }
+  },
+  "icons": {
+    "16": "icons/app-192.png",
+    "48": "icons/app-192.png",
+    "128": "icons/app-512.png"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  }
+}

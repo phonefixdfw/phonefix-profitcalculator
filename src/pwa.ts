@@ -1,6 +1,6 @@
-/** Register only in production; Vite serves a cleanup worker for existing installs. */
+/** Register only in production (never inside the Chrome extension popup); Vite serves a cleanup worker for existing installs. */
 export async function setupPwa(): Promise<void> {
-  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
+  if (!import.meta.env.PROD || !('serviceWorker' in navigator) || location.protocol === 'chrome-extension:') return;
   const banner = document.createElement('aside');
   banner.className = 'app-update';
   banner.setAttribute('aria-label', 'App update');

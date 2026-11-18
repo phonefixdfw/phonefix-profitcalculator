@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --strictPort",
     "build": "tsc --noEmit && vite build",
+    "build:extension": "tsc --noEmit && vite build --config vite.extension.config.ts",
     "preview": "vite preview --host 0.0.0.0 --strictPort",
     "test": "vitest run",
     "test:watch": "vitest",

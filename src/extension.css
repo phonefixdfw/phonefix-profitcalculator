@@ -1,0 +1,18 @@
+/* Extension layout only; the calculator itself uses the shared style.css. */
+.site-header { height: 56px; }
+.header-caption { display: none; }
+
+/* Popup: compact, no intro block (Settings lives on the options page). */
+body[data-view="popup"] { width: 380px; min-width: 0; overflow-x: hidden; }
+body[data-view="popup"] .site-header { padding: 0 16px; }
+body[data-view="popup"] main { padding: 16px 16px 16px; }
+body[data-view="popup"] .intro { display: none; }
+body[data-view="popup"] .calculator { display: block; }
+body[data-view="popup"] .calculator > * + * { margin-top: 16px; }
+
+/* Options page: only the Settings panel. */
+body[data-view="options"] main { max-width: 720px; }
+body[data-view="options"] .intro,
+body[data-view="options"] #tool-tabs,
+body[data-view="options"] #calculator-panel,
+body[data-view="options"] #saved-repairs-panel { display: none; }
