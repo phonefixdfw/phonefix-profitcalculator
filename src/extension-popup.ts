@@ -7,5 +7,7 @@ declare const chrome: { storage: { local: StorageArea } };
 const storage = await createExtensionStorage(chrome.storage.local);
 Object.defineProperty(window, 'localStorage', { value: storage, configurable: true });
 await import('./main');
-// Loaded last so the popup sizing wins over the shared stylesheet.
+// Loaded last so the extension layout wins over the shared stylesheet.
 await import('./extension.css');
+// The options page hosts the same Settings panel (and settings-code import); open it right away.
+if (document.body.dataset.view === 'options') document.querySelector<HTMLButtonElement>('#settings-toggle')!.click();

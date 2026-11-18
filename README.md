@@ -154,6 +154,6 @@ Load it:
 
 Update it: `git pull`, run `npm run build:extension` again, then click the reload icon on the extension's card in `chrome://extensions`.
 
-Settings must be imported once. The extension has its own storage (`chrome.storage.local`), separate from `calc.phone-fix.com`. In the web app, open Settings and use **Copy settings code**; in the extension popup, open Settings, paste it into **Load settings code**, review and confirm. The settings code format is unchanged.
+Settings must be imported once. The extension has its own storage (`chrome.storage.local`), separate from `calc.phone-fix.com`, and the popup has no Settings button to keep it small. In the web app, open Settings and use **Copy settings code**. Then right-click the extension's toolbar icon, choose **Options** (it opens in a tab, or use **Details → Extension options** on `chrome://extensions`), paste the code into **Load settings code**, review and confirm. The Options page is the same Settings panel as the web app and the code format is unchanged. The popup picks the new rates up the next time it opens.
 
 Screenshot: `docs/issue-23/popup.png`. The Playwright test `tests/extension.spec.ts` builds the extension and loads it in Chromium.

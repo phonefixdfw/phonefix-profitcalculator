@@ -13,7 +13,7 @@ export default defineConfig({
     emptyOutDir: true,
     target: 'chrome120',
     modulePreload: false,
-    rollupOptions: { input: resolve('extension/popup.html') },
+    rollupOptions: { input: [resolve('extension/popup.html'), resolve('extension/options.html')] },
   },
   plugins: [{
     name: 'phonefix-extension-assets',

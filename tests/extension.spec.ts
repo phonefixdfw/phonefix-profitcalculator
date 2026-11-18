@@ -9,7 +9,7 @@ import { encodeSettingsCode } from '../src/settings-code';
 const extensionDir = resolve('dist-extension');
 
 
-test('built extension popup calculates, imports a settings code and keeps it in chrome.storage.local', async ({}, testInfo) => {
+test('built extension popup calculates, imports a settings code on the options page and keeps it in chrome.storage.local', async ({}, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One run is enough; the popup has its own size.');
   test.setTimeout(120_000);
   execFileSync('npm', ['run', 'build:extension'], { stdio: 'pipe' });
@@ -18,6 +18,7 @@ test('built extension popup calculates, imports a settings code and keeps it in 
   expect(manifest.manifest_version).toBe(3);
   expect(manifest.permissions).toEqual(['storage']);
   expect(manifest.host_permissions).toBeUndefined();
+  expect(manifest.options_ui).toEqual({ page: 'options.html', open_in_tab: true });
 
   const profile = mkdtempSync(join(tmpdir(), 'phonefix-ext-'));
   const context = await chromium.launchPersistentContext(profile, {
@@ -40,19 +41,22 @@ test('built extension popup calculates, imports a settings code and keeps it in 
     })();
     expect(id).toBeTruthy();
 
-    const open = async () => {
+    const open = async (view: 'popup' | 'options') => {
       const page = await context.newPage();
       const errors: string[] = [];
       const external: string[] = [];
       page.on('pageerror', (error) => errors.push(error.message));
       page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
       page.on('request', (request) => { if (!request.url().startsWith(`chrome-extension://${id}/`)) external.push(request.url()); });
-      await page.goto(`chrome-extension://${id}/popup.html`);
-      await expect(page.getByRole('heading', { name: 'Know what you keep.' })).toBeVisible();
+      await page.goto(`chrome-extension://${id}/${view}.html`);
       return { page, errors, external };
     };
 
-    const first = await open();
+    const first = await open('popup');
+    await expect(first.page.getByRole('heading', { name: 'Repair ticket' })).toBeVisible();
+    // The popup has no intro block or Settings button; settings live on the options page.
+    await expect(first.page.getByRole('heading', { name: 'Know what you keep.' })).toBeHidden();
+    await expect(first.page.getByRole('button', { name: 'Settings', exact: true })).toBeHidden();
     await expect(first.page.getByLabel('What should I charge?')).toBeChecked();
     // Screenshot before any ticket is entered so no warranty costs end up in a committed file.
     mkdirSync('docs/issue-23', { recursive: true });
@@ -63,23 +67,28 @@ test('built extension popup calculates, imports a settings code and keeps it in 
     expect(await first.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await first.page.getByRole('button', { name: /^Clear/ }).click();
     await expect(first.page.getByLabel('What should I charge?')).toBeChecked();
-
-    // Bring settings over once with the existing settings code.
-    const code = await encodeSettingsCode({ ...DEFAULT_CONFIG, salesTaxBps: 1000, cardFeeBps: 300 });
-    await first.page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await first.page.getByLabel('Load settings code').fill(code);
-    await first.page.getByRole('button', { name: 'Review settings code' }).click();
-    await first.page.getByRole('button', { name: 'Confirm and save settings' }).click();
-    await expect(first.page.getByText('Settings loaded and applied.', { exact: true })).toBeVisible();
-    await first.page.waitForTimeout(200);
     expect(first.errors).toEqual([]);
     expect(first.external).toEqual([]);
     await first.page.close();
 
+    // Bring settings over once on the options page with the existing settings code.
+    const code = await encodeSettingsCode({ ...DEFAULT_CONFIG, salesTaxBps: 1000, cardFeeBps: 300 });
+    const options = await open('options');
+    await expect(options.page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
+    await expect(options.page.getByRole('heading', { name: 'Repair ticket' })).toBeHidden();
+    await options.page.getByLabel('Load settings code').fill(code);
+    await options.page.getByRole('button', { name: 'Review settings code' }).click();
+    await options.page.getByRole('button', { name: 'Confirm and save settings' }).click();
+    await expect(options.page.getByText('Settings loaded and applied.', { exact: true })).toBeVisible();
+    await options.page.waitForTimeout(200);
+    expect(options.errors).toEqual([]);
+    expect(options.external).toEqual([]);
+    await options.page.close();
+
     // A fresh popup reads the settings back from chrome.storage.local.
-    const second = await open();
-    await second.page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await expect(second.page.getByLabel('Sales tax rate (%)')).toHaveValue('10.00');
+    const second = await open('popup');
+    await second.page.getByLabel('Profit from a price').check();
+    await expect(second.page.locator('#rates-note')).toContainText('10% sales tax');
     const stored = await second.page.evaluate(async () => {
       const data = await (globalThis as any).chrome.storage.local.get('phonefix-extension-data');
       return JSON.parse(data['phonefix-extension-data']['phonefix-settings']).salesTaxBps;
