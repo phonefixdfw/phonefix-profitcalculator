@@ -53,12 +53,13 @@ test('built extension popup calculates, imports a settings code and keeps it in 
     };
 
     const first = await open();
+    // Screenshot before any ticket is entered so no warranty costs end up in a committed file.
+    mkdirSync('docs/issue-23', { recursive: true });
+    await first.page.screenshot({ path: 'docs/issue-23/popup.png' });
     await first.page.getByLabel('Profit from a price').check();
     await first.page.getByLabel('Repair price before tax').fill('91');
     await expect(first.page.locator('#profit')).toHaveText('$73.77');
     expect(await first.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    mkdirSync('docs/issue-23', { recursive: true });
-    await first.page.screenshot({ path: 'docs/issue-23/popup.png', fullPage: true });
 
     // Bring settings over once with the existing settings code.
     const code = await encodeSettingsCode({ ...DEFAULT_CONFIG, salesTaxBps: 1000, cardFeeBps: 300 });
