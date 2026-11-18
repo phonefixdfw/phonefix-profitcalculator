@@ -86,16 +86,20 @@ export function isStoredConfig(value: unknown): value is StoredConfig {
   });
 }
 
-export function loadSettings(): ShopConfig {
+/** Parses stored settings JSON; anything missing or invalid yields the defaults. */
+export function configFromStored(raw: string | null | undefined): ShopConfig {
   try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) {
       const value: unknown = JSON.parse(raw);
       // Older saved settings predate target pricing; keep their rates and tiers.
       if (isStoredConfig(value)) return { ...value, defaultTargetProfit: value.defaultTargetProfit ?? DEFAULT_CONFIG.defaultTargetProfit };
     }
-  } catch { /* Storage may be unavailable or malformed. */ }
+  } catch { /* Malformed JSON. */ }
   return DEFAULT_CONFIG;
+}
+
+export function loadSettings(): ShopConfig {
+  try { return configFromStored(localStorage.getItem(SETTINGS_KEY)); } catch { return DEFAULT_CONFIG; }
 }
 
 export function saveSettings(config: ShopConfig): boolean {

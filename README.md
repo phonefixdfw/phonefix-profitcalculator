@@ -137,7 +137,7 @@ Repairs use their own localStorage key, `phonefix-saved-repairs`, containing `{ 
 
 ## Chrome extension (private, toolbar popup)
 
-The calculator is also packaged as a Manifest V3 Chrome extension that opens from the toolbar. It uses the same calculation, config, money and settings modules as the web app. It requests only the `storage` permission, has no host access, makes no network requests and loads no remote code. It is loaded unpacked; it is not published to the Chrome Web Store.
+The calculator is also packaged as a Manifest V3 Chrome extension that opens from the toolbar. It uses the same calculation, config, money and settings modules as the web app. Its permissions are listed under [Right-click price suggestion](#right-click-price-suggestion-extension-phase-2); it has no host access, makes no network requests and loads no remote code. It is loaded unpacked; it is not published to the Chrome Web Store.
 
 Build it:
 
@@ -157,3 +157,27 @@ Update it: `git pull`, run `npm run build:extension` again, then click the reloa
 Settings must be imported once. The extension has its own storage (`chrome.storage.local`), separate from `calc.phone-fix.com`, and the popup has no Settings button to keep it small. In the web app, open Settings and use **Copy settings code**. Then right-click the extension's toolbar icon, choose **Options** (it opens in a tab, or use **Details → Extension options** on `chrome://extensions`), paste the code into **Load settings code**, review and confirm. The Options page is the same Settings panel as the web app and the code format is unchanged. The popup picks the new rates up the next time it opens.
 
 Screenshot: `docs/issue-23/popup.png`. The Playwright test `tests/extension.spec.ts` builds the extension and loads it in Chromium.
+
+### Right-click price suggestion (extension phase 2)
+
+On any vendor page, highlight a part price (for example `$16.38`, `$19.40` or `$37.03`), right-click and choose **Suggest repair price**. The extension treats the number as the **part cost** and shows a small result box next to the selection with the same target-profit result as the web app's **What should I charge?** mode: the lowest price that hits the target ("Charge") with its profit and, for screen repairs, **Recommended: top of tier** with the same short note (plus **Drop a tier?** when it applies).
+
+- Defaults: screen repair (warranty on), card, and the saved default target profit from the settings you imported into the extension (see above; without an import, the built-in defaults are used).
+- In the box you can edit the target profit and toggle **Screen repair** and **Cash**; the result updates as you type. Press **Escape**, click outside the box or use × to close it.
+- The menu item appears only when text is selected. If the selection is not one clean price (a range like `$10 - $20`, several numbers, an empty or non-price selection, `$0.00`), the box says "Couldn't read a price" and shows no result. `src/price-parser.ts` reads the text into integer cents with the existing `parseMoney`, so no floating point is involved. It accepts an optional `$`, thousands commas, one or two decimals and short surrounding text such as `Price: $16.38 USD`; text around the number needs a `$` or `USD` marker.
+- It works on any site; there is no site-specific scraping. The page is read only through the selected text the menu hands over; the result box is a single shadow-DOM element, so page styles and the box's styles do not affect each other.
+
+Permissions (`extension/manifest.json`), all minimal:
+
+| Permission | Why |
+| --- | --- |
+| `storage` | Keep the imported settings (phase 1). |
+| `contextMenus` | The **Suggest repair price** item, shown only for a selection. |
+| `activeTab` | Temporary access to the current tab after you choose the menu item. |
+| `scripting` | Inject the result box into that tab. |
+
+There are **no host permissions**, no network requests and no remote code. The result box script (`suggest-box.js`) ships inside the extension and is injected only when you choose the menu item.
+
+After pulling, run `npm run build:extension` (it now also builds `suggest-box.js` and the background worker) and reload the extension in `chrome://extensions`; Chrome may ask you to accept the new permissions.
+
+Tests: `src/price-parser.test.ts` (parser) and `tests/extension-context-menu.spec.ts` (loads the built extension in Chromium on `tests/fixtures/vendor-price.html`; Chrome's native menu can't be clicked from Playwright, so the test fires the same `contextMenus.onClicked` event and uses a test-only copy of the manifest with a host permission for the local fixture server; the shipped manifest is asserted to have none). Screenshot: `docs/issue-24/result-box.png` (uses made-up warranty costs, not the shop's).
