@@ -9,6 +9,7 @@ test('calculates live, shows tier hints, and resets for the next ticket', async 
     if (new URL(request.url()).hostname !== '127.0.0.1') externalRequests.push(request.url());
   });
   await page.goto('/');
+  await page.getByLabel('Profit from a price').check();
   await expect(page.getByRole('heading', { name: 'Know what you keep.' })).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'Enter a repair price' })).toBeVisible();
   await page.getByLabel('Repair price before tax').fill('91');
@@ -42,18 +43,20 @@ test('calculates live, shows tier hints, and resets for the next ticket', async 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.getByRole('button', { name: 'Clear' }).click();
-  await expect(page.getByLabel('Repair price before tax')).toBeEmpty();
-  await expect(page.getByLabel('Repair price before tax')).toBeFocused();
+  await expect(page.getByLabel('What should I charge?')).toBeChecked();
+  await expect(page.getByLabel('Target profit', { exact: true })).toHaveValue('80.00');
+  await expect(page.getByLabel('Part cost', { exact: true })).toBeFocused();
   await expect(page.getByLabel('Part cost', { exact: true })).toHaveValue('0.00');
   await expect(page.getByLabel('Screen repair')).toBeChecked();
   await expect(page.getByLabel('Card', { exact: true })).toBeChecked();
-  await expect(page.locator('#profit')).toHaveText('—');
+  await expect(page.locator('#target-result')).toBeVisible();
   expect(errors).toEqual([]);
   expect(externalRequests).toEqual([]);
 });
 
 test('ties higher-tier warranty suggestions to the exact suggested price', async ({ page }) => {
   await page.goto('/');
+  await page.getByLabel('Profit from a price').check();
   const price = page.getByLabel('Repair price before tax');
 
   await price.fill('139');
@@ -78,6 +81,7 @@ test('ties higher-tier warranty suggestions to the exact suggested price', async
 
 test('handles invalid, empty, zero and huge amounts without stale results or overflow', async ({ page }) => {
   await page.goto('/');
+  await page.getByLabel('Profit from a price').check();
   const price = page.getByLabel('Repair price before tax');
   await price.fill('93');
   await expect(page.locator('#profit')).toHaveText('$69.10');
@@ -103,6 +107,7 @@ test('handles invalid, empty, zero and huge amounts without stale results or ove
 
 test('saves settings, applies them immediately, and restores them after reload', async ({ page }) => {
   await page.goto('/');
+  await page.getByLabel('Profit from a price').check();
   await page.getByLabel('Repair price before tax').fill('91');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Sales tax rate (%)').fill('10');
@@ -118,6 +123,7 @@ test('saves settings, applies them immediately, and restores them after reload',
   await expect(page.locator('#profit')).toHaveText('$62.50');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.reload();
+  await page.getByLabel('Profit from a price').check();
   await page.getByLabel('Repair price before tax').fill('91');
   await expect(page.locator('#profit')).toHaveText('$62.50');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -126,14 +132,17 @@ test('saves settings, applies them immediately, and restores them after reload',
   await page.getByRole('button', { name: 'Reset to defaults' }).click();
   await expect(page.locator('#profit')).toHaveText('$73.77');
   await page.reload();
+  await page.getByLabel('Profit from a price').check();
   await page.getByLabel('Repair price before tax').fill('91');
   await expect(page.locator('#profit')).toHaveText('$73.77');
 });
 
 test('rejects invalid tiers and falls back from corrupt stored settings', async ({ page }) => {
   await page.goto('/');
+  await page.getByLabel('Profit from a price').check();
   await page.evaluate(() => localStorage.setItem('phonefix-settings', '{broken'));
   await page.reload();
+  await page.getByLabel('Profit from a price').check();
   await page.getByLabel('Repair price before tax').fill('91');
   await expect(page.locator('#profit')).toHaveText('$73.77');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -157,6 +166,7 @@ test('rejects invalid tiers and falls back from corrupt stored settings', async 
 
 test('edits warranty rows and supports keyboard access', async ({ page }) => {
   await page.goto('/');
+  await page.getByLabel('Profit from a price').check();
   await page.getByRole('button', { name: 'Settings', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByLabel('Sales tax rate (%)')).toBeFocused();

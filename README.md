@@ -74,7 +74,7 @@ Open **Warranty tiers** below the calculator for a quick reference showing every
 
 ## Counter behavior and input limits
 
-- Default to a screen repair paid by card, with $0 parts. Clear restores these defaults and focuses the blank price for the next ticket.
+- Open in **What should I charge?** (target-profit) mode, with the target set to the saved default, a screen repair paid by card and $0 parts. **Clear** restores these defaults, including the mode, and focuses part cost. Switch to **Profit from a price** at any time; the choice is not stored, so a reload or Clear returns to target mode.
 - Enter dollars and up to two decimal places, without currency signs, commas or exponent notation. Negative, blank, malformed or excessive amounts show a short message and clear the result. A zero entered repair price shows a prompt. A positive price discounted to zero shows the actual loss, including parts, warranty and any fixed card fee.
 - Price and parts are each capped at **$999,999.99** to reject accidental huge input and keep the counter UI readable. The pure engine accepts zero cents but rejects negative, fractional, non-finite and over-limit monetary inputs.
 - Losses show a red result and a “Loss” label. The margin is rounded to one decimal place for display.
@@ -92,7 +92,7 @@ Enter percentages and dollar amounts with up to two decimal places. Rates must b
 
 ## Target-profit pricing, discounts and labor time
 
-Choose **What should I charge?** to enter a target profit with the same part cost, screen-repair and payment controls. The default target is **$80.00**, editable in Settings. Saving or resetting settings applies that default to the target field; Clear restores it. Older saved settings retain their rates and tiers and gain the $80 default.
+**What should I charge?** is the default mode on load and after Clear: enter a target profit with the same part cost, screen-repair and payment controls. The default target is **$80.00**, editable in Settings. Saving or resetting settings applies that default to the target field; Clear restores it. Older saved settings retain their rates and tiers and gain the $80 default.
 
 `findTargetPrice` in `src/calc.ts` returns the **lowest pre-tax cent price** meeting the target, with a full `calculateTicket` breakdown. It searches each warranty tier separately, in price order. Exact integer bounds narrow the usual cent search. For unusual rates near or above a 100% effective card fee, a bounded search of 10,000 tax-rounding residues solves the exact half-up inequality. It does not assume profit is monotonic, even within a tier. Every suggested result is verified by `calculateTicket`. Targets that cannot be reached within the $999,999.99 price limit show a message.
 
@@ -127,9 +127,9 @@ Optional **labor minutes** works in both modes. It accepts up to two decimal pla
 
 Use the **Calculator** and **Saved repairs** tabs with a tap or the left/right arrow keys. Home and End select the first and last tabs. Settings remains an inline panel above the tabs.
 
-**Add repair** saves a name (up to 120 characters), part cost, usual pre-tax price, screen warranty choice, and optional labor minutes. Repairs appear A–Z, with a name search when there are more than ten. Edit a repair or delete it after confirmation. Tapping a repair fills the calculator, switches to normal price mode, and clears any discount; the current card/cash choice stays in place. **Clear** also clears the loaded repair name.
+**Add repair** saves a name (up to 120 characters), part cost, usual pre-tax price, screen warranty choice, and optional labor minutes. Repairs appear A–Z, with a name search when there are more than ten. Edit a repair or delete it after confirmation. Tapping a repair fills the calculator, switches to **Profit from a price** mode (its saved price is the input), and clears any discount; the current card/cash choice stays in place. **Clear** also clears the loaded repair name.
 
-**Save current as repair** opens a prefilled form. In normal mode, it uses the usual price before any discount. In target-profit mode, it uses the calculated minimum price. Payment and temporary discounts are not saved in a preset.
+**Save current as repair** opens a prefilled form. In Profit from a price mode, it uses the usual price before any discount. In target-profit mode, it uses the calculated minimum price. Payment and temporary discounts are not saved in a preset.
 
 Repairs use their own localStorage key, `phonefix-saved-repairs`, containing `{ version: 1, repairs: [...] }`. Money is stored in integer cents and optional `laborHundredths` in hundredths of a minute. Missing, corrupt, invalid or unknown-version data starts with an empty list without modifying settings. Failed writes keep the form available with an error message. Saved repairs are specific to this browser and device; clearing site data removes them.
 

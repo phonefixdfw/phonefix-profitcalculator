@@ -5,6 +5,7 @@ test('expands the warranty reference without moving the calculator and tracks th
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   await page.goto('/');
+  await page.getByLabel('Profit from a price').check();
   const reference = page.locator('#warranty-reference');
   const table = reference.getByRole('table', { name: 'Warranty tiers' });
   const rows = table.locator('tbody tr');
@@ -43,6 +44,7 @@ test('expands the warranty reference without moving the calculator and tracks th
   await price.fill('600');
   await expect(rows.nth(11)).toHaveAttribute('aria-current', 'true');
   await page.getByRole('button', { name: 'Clear', exact: true }).click();
+  await page.getByLabel('Profit from a price').check();
   await expect(reference.locator('tr[aria-current]')).toHaveCount(0);
 
   await reference.locator('summary').focus();
@@ -55,6 +57,7 @@ test('expands the warranty reference without moving the calculator and tracks th
 
 test('updates the reference from saved tax and tier settings, reloads and resets', async ({ page }) => {
   await page.goto('/');
+  await page.getByLabel('Profit from a price').check();
   const reference = page.locator('#warranty-reference');
   const rows = reference.locator('tbody tr');
   await reference.locator('summary').click();
@@ -78,6 +81,8 @@ test('updates the reference from saved tax and tier settings, reloads and resets
   await expect(rows.nth(0)).toHaveAttribute('aria-current', 'true');
 
   await page.reload();
+
+  await page.getByLabel('Profit from a price').check();
   await reference.locator('summary').click();
   await expect(rows.nth(0).getByRole('cell')).toHaveText(['$0.00 – $109.99', '$16.00', '$99.99']);
   await expect(reference).toContainText('10% sales tax');

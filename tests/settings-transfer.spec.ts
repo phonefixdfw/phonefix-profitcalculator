@@ -15,6 +15,7 @@ test('copies saved settings, renders a local QR and imports into a fresh browser
   const observed = monitor(page);
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/');
+  await page.getByLabel('Profit from a price').check();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Sales tax rate (%)').fill('10');
   await page.getByLabel('Card fee (%)').fill('3');
@@ -54,9 +55,11 @@ test('copies saved settings, renders a local QR and imports into a fresh browser
     await expect(dialog).toBeHidden();
     await expect(other.getByText('Settings loaded and applied.', { exact: true })).toBeVisible();
     expect(await other.evaluate(() => localStorage.getItem('phonefix-settings'))).toBe(saved);
+    await other.getByLabel('Profit from a price').check();
     await other.getByLabel('Repair price before tax').fill('91');
     await expect(other.locator('#profit')).toHaveText('$62.50');
     await other.reload();
+    await other.getByLabel('Profit from a price').check();
     await other.getByRole('button', { name: 'Settings', exact: true }).click();
     await expect(other.getByLabel('Sales tax rate (%)')).toHaveValue('10.00');
     await expect(other.getByLabel('Card fee (%)')).toHaveValue('3.00');
