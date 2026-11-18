@@ -134,3 +134,26 @@ Use the **Calculator** and **Saved repairs** tabs with a tap or the left/right a
 Repairs use their own localStorage key, `phonefix-saved-repairs`, containing `{ version: 1, repairs: [...] }`. Money is stored in integer cents and optional `laborHundredths` in hundredths of a minute. Missing, corrupt, invalid or unknown-version data starts with an empty list without modifying settings. Failed writes keep the form available with an error message. Saved repairs are specific to this browser and device; clearing site data removes them.
 
 **Copy quote** copies plain text such as `iPhone 13 screen: $129.99 + tax = $140.71`. It uses the loaded repair name or “Repair”, the current discounted pre-tax price (or suggested minimum in target mode), and the calculator's rounded tax-included total. Quotes contain no parts, fees, warranty costs or profit. A brief “Copied” message confirms success. If clipboard access is unavailable or denied, the quote appears selected in a text box for the device's Copy command. Invalid or empty tickets disable copying.
+
+## Chrome extension (private, toolbar popup)
+
+The calculator is also packaged as a Manifest V3 Chrome extension that opens from the toolbar. It uses the same calculation, config, money and settings modules as the web app. It requests only the `storage` permission, has no host access, makes no network requests and loads no remote code. It is loaded unpacked; it is not published to the Chrome Web Store.
+
+Build it:
+
+```sh
+npm ci
+npm run build:extension   # writes dist-extension/
+```
+
+Load it:
+
+1. Open `chrome://extensions` and turn on **Developer mode**.
+2. Click **Load unpacked** and choose the `dist-extension` folder.
+3. Pin **PhoneFix Profit Calculator** from the puzzle-piece menu, then click its icon.
+
+Update it: `git pull`, run `npm run build:extension` again, then click the reload icon on the extension's card in `chrome://extensions`.
+
+Settings must be imported once. The extension has its own storage (`chrome.storage.local`), separate from `calc.phone-fix.com`. In the web app, open Settings and use **Copy settings code**; in the extension popup, open Settings, paste it into **Load settings code**, review and confirm. The settings code format is unchanged.
+
+Screenshot: `docs/issue-23/popup.png`. The Playwright test `tests/extension.spec.ts` builds the extension and loads it in Chromium.
