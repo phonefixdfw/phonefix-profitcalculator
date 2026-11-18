@@ -1,61 +1,67 @@
 # PhoneFix DFW repair profit calculator
 
-A small, static Vite + TypeScript app for pricing one repair at the shop counter. Runs entirely in the browser, with no backend, tracking, external fonts, or application network requests. Shop settings and saved repairs are saved in this browser; no data is sent.
+A small static Vite + TypeScript app for pricing one repair at the shop counter. It runs entirely in the browser: no backend, tracking, external fonts or application network requests. Shop settings and saved repairs live in this browser only. The same calculator is also packaged as a private Chrome extension (toolbar popup plus a right-click price suggestion).
 
-## Run
+- [Quick start](#quick-start)
+- [Install and use offline](#install-and-use-offline) · [Search engines](#search-engines)
+- [Rates and money contract](#rates-and-money-contract) · [Calculation order and rounding](#calculation-order-and-rounding)
+- [Warranty pricing hints](#warranty-pricing-hints) · [Counter behavior and input limits](#counter-behavior-and-input-limits)
+- [Shop settings](#shop-settings) · [Settings code format](#settings-code-format)
+- [Target-profit pricing](#target-profit-pricing-what-should-i-charge) · [Discounts and labor time](#discounts-and-labor-time)
+- [Saved repairs and customer quotes](#saved-repairs-and-customer-quotes)
+- [Chrome extension](#chrome-extension-private-sideloaded)
+
+## Quick start
 
 Requires Node.js 22.12+ and npm.
 
 ```sh
 npm install
-npm run dev
-# Custom preview port (the server fails if the port is occupied):
-PORT=5795 npm run dev
+npm run dev                 # http://localhost:5173 (PORT=5795 npm run dev for another port)
 ```
 
-The dev server listens on all interfaces; the default port is 5173. `PORT` is read in `vite.config.ts`. Both dev and preview allow the shop's LAN hostname `taint`, the current machine's hostname, localhost and IP addresses, and fail if the requested port is occupied.
+| Command | What it does |
+| --- | --- |
+| `npm run build` | TypeScript check, then the static site in `dist/` (deploy that folder to any static host) |
+| `npm run preview` | Serve the production build locally (port 4173, or `PORT`) |
+| `npm test` | Vitest unit tests |
+| `npx playwright install chromium` then `npm run test:e2e` | Browser tests on desktop Chromium and a 390px phone; run `npm run build` first |
+| `npm run build:extension` | TypeScript check, then the Chrome extension in `dist-extension/` |
+| `npm run typecheck` | TypeScript check only |
 
-```sh
-npm run build       # TypeScript check, then static files in dist/
-npm run preview     # Serve the production build locally
-npm test            # Vitest unit tests
-npx playwright install chromium
-npm run test:e2e    # Desktop Chromium and 390px phone smoke tests
-```
-
-Both dev and preview respect `PORT`; preview defaults to 4173. Run `npm run build` before the e2e suite. Playwright serves the production build on port 5795 (or `PORT`) and stops it afterward; locally it can reuse an existing preview server. The suite checks search-engine directives, installation, offline use, updates and settings transfer on desktop and a 390px phone. CI installs Chromium and runs build, unit tests and browser tests. Deploy the contents of `dist/` to a static host.
+Dev and preview listen on all interfaces, fail if the port is taken, and allow the shop's LAN hostname `taint`, the machine's hostname, localhost and IP addresses (`vite.config.ts`). Playwright serves the production build on port 5795 (or `PORT`) and stops it afterward; locally it can reuse a running server. The e2e suite covers search-engine directives, installation, offline use, updates, settings transfer, saved repairs and the built extension. The extension tests run once, on desktop. CI (`.github/workflows/ci.yml`) runs install, build, unit tests and the e2e suite on every pull request and push to `main`.
 
 ## Install and use offline
 
-Visit `https://calc.phone-fix.com/` once while connected and let the page finish loading. Use the browser's **Install app** / **Add to Home Screen** menu to install on a phone or desktop. The production service worker precaches all built app files, including the locally bundled QR generator, manifest and icons. The app then opens and calculates without an internet connection. Settings still live in each browser's localStorage; clearing site data removes both settings and the offline cache.
+Visit `https://calc.phone-fix.com/` once while connected and let the page finish loading, then use the browser's **Install app** / **Add to Home Screen** menu. The production service worker precaches every built file (including the locally bundled QR generator, manifest and icons), so the app opens and calculates without a connection. Clearing site data removes both settings and the offline cache.
 
-Every production build generates a service worker with a content-based cache revision. On the next connected load it checks for a deploy; **Updated, reload** activates the downloaded update and reloads when convenient. Closing all app windows also lets a waiting update activate for the next launch. Old app caches are removed after activation; saved settings are retained. The app registers the worker only in production builds. When switching a preview origin to development, Vite serves a temporary cleanup worker at `/sw.js`: even a cached production page can update to it, remove only the app's precaches, unregister and reload controlled tabs into development. Saved settings and unrelated caches are retained. Serve over HTTPS (localhost also works); the host should revalidate `/sw.js` rather than cache it immutably.
+Each production build gets a service worker with a content-based cache revision. On the next connected load the app checks for a deploy; **Updated, reload** activates the downloaded update and reloads when convenient. Closing all app windows also lets a waiting update activate on next launch. Old caches are removed after activation; saved settings are kept. The worker is registered only in production builds (never in the extension). When a preview origin is switched to the dev server, Vite serves a cleanup worker at `/sw.js` that removes only the app's precaches, unregisters and reloads controlled tabs. Serve over HTTPS (localhost also works) and have the host revalidate `/sw.js` rather than cache it immutably.
 
-The app icons are original calculator/phone artwork in `public/app-icon.svg`. To regenerate the committed PNGs after editing the artwork, install Playwright Chromium and run `node scripts/generate-icons.mjs`. The maskable version uses the same artwork inside its central safe area.
+Icons are original artwork in `public/app-icon.svg`. To regenerate the committed PNGs after editing it, install Playwright Chromium and run `node scripts/generate-icons.mjs` (the maskable version reuses the artwork in its safe area).
 
 ## Search engines
 
-`public/robots.txt` is copied to the build root and disallows crawling for all user agents. The HTML includes `robots` (`noindex, nofollow, noarchive, nosnippet`) and `googlebot` (`noindex, nofollow`) meta directives. No sitemap or social preview tags are published. These directives rely on crawler compliance; the calculator remains publicly accessible without a login. No hosting header configuration is tracked in this repo; the host can also send `X-Robots-Tag: noindex, nofollow` on all paths.
+`public/robots.txt` (copied to the build root) disallows all crawlers, and the HTML carries `robots` (`noindex, nofollow, noarchive, nosnippet`) and `googlebot` (`noindex, nofollow`) meta tags. No sitemap or social preview tags are published. These rely on crawler compliance; the calculator stays publicly reachable without a login. No hosting headers are tracked in this repo; the host can also send `X-Robots-Tag: noindex, nofollow`.
 
 ## Rates and money contract
 
-The owner's real rates live in **`src/config.ts`**, in `DEFAULT_CONFIG`: 8.25% sales tax, a 2% Square card fee on the tax-included total, a $0 fixed card fee, and all 12 screen-warranty tiers. These are shop-provided business inputs, not a tax-rate lookup. All money in config and calculation inputs/outputs is **integer cents**. Rates are integer basis points: 825 = 8.25%, 200 = 2%.
+The shop's rates live in **`src/config.ts`** (`DEFAULT_CONFIG`): 8.25% sales tax, a 2% Square card fee on the tax-included total, a $0 fixed card fee, an $80.00 default target profit and all 12 screen-warranty tiers. These are shop-provided inputs, not a tax-rate lookup. All money is **integer cents** and rates are integer **basis points** (825 = 8.25%, 200 = 2%).
 
-Warranty tiers are an ordered list of `{ min, max, cost }` in cents. Both bounds are inclusive; only the last tier has `max: null` (no upper limit). Tier selection uses the **tax-included ticket total**. Screen repairs include the shop-paid 1-year accidental damage warranty; other repairs have no warranty charge.
+Warranty tiers are an ordered list of `{ min, max, cost }` in cents. Both bounds are inclusive; only the last tier has `max: null` (no upper limit). The tier is chosen by the **tax-included ticket total**. Screen repairs include the shop-paid 1-year accidental damage warranty; other repairs have no warranty charge.
 
-`calculateTicket(input, config = DEFAULT_CONFIG)` in **`src/calc.ts`** is pure and accepts custom `ShopConfig` values and receives the saved settings from the settings screen. Custom configs must have nonnegative integer basis-point rates, cent amounts, and contiguous ordered tiers covering zero upward.
+`calculateTicket(input, config = DEFAULT_CONFIG)` in **`src/calc.ts`** is pure and takes any `ShopConfig`, such as the saved settings. A custom config needs nonnegative integer basis-point rates and cent amounts, and contiguous ordered tiers that start at zero.
 
 ## Calculation order and rounding
 
-1. **Tax** = pre-tax repair price × tax rate, rounded half-up to the nearest cent. **Ticket total** = price + rounded tax.
-2. **Card fee**, for card payments only = ticket total × card rate, rounded half-up to the nearest cent, plus the fixed fee in cents. Adding the integer fixed fee before or after rounding gives the same result. Cash has no fee.
-3. **Warranty**, for screen repairs only = cost of the tier containing the ticket total.
-4. **Net profit** = pre-tax price − part cost − card fee − warranty. Tax goes to the state: it is neither revenue nor a cost in this formula.
-5. **Margin** = net profit ÷ pre-tax price. The engine returns `null` for a zero-price margin. This is profit before labor, overhead and income taxes.
+1. **Tax** = pre-tax price × tax rate, rounded half-up to the cent. **Ticket total** = price + tax.
+2. **Card fee** (card payments only) = ticket total × card rate, rounded half-up, plus the fixed fee. Cash has no fee.
+3. **Warranty** (screen repairs only) = cost of the tier containing the ticket total.
+4. **Net profit** = pre-tax price − part cost − card fee − warranty. Tax goes to the state, so it is neither revenue nor a cost here.
+5. **Margin** = net profit ÷ pre-tax price (`null` for a zero price). This is profit before labor, overhead and income taxes.
 
-Percentage calculations use integer `BigInt` arithmetic and explicit half-up rounding, so floating-point multiplication cannot move a ticket across a cent boundary. Only the final margin is a floating-point ratio. Input text is parsed directly into cents without rounding extra decimals.
+Percentages use integer `BigInt` arithmetic with explicit half-up rounding, so floating point never moves a ticket across a cent boundary. Only the final margin is a floating-point ratio. Input text is parsed straight into cents; extra decimals are rejected, not rounded.
 
-Examples with a $0 part cost, card payment and screen repair:
+Examples ($0 parts, card, screen repair, default settings):
 
 | Price | Tax | Ticket total | Card fee | Warranty | Net profit |
 | --- | --- | --- | --- | --- | --- |
@@ -66,118 +72,128 @@ Examples with a $0 part cost, card payment and screen repair:
 
 ## Warranty pricing hints
 
-The engine binary-searches integer pre-tax cents to find the highest price whose **rounded** tax-included total fits in the previous tier. It recalculates profit using the same parts and payment method, and returns a hint only if that price earns the same or more profit. At $93, the hint recommends $92.37 and shows **$6.01 more profit** ($75.11). There is no lower-tier hint at $91.
+In **Profit from a price** mode the engine binary-searches integer pre-tax cents for the highest price whose **rounded** tax-included total still fits in the previous tier. It recalculates profit with the same parts and payment, and shows a hint only if that price earns the same or more. At $93 the hint recommends $92.37 and **$6.01 more profit** ($75.11); at $91 there is no lower-tier hint. It also reports the highest pre-tax price of the current tier: $92.37 for tier 1, $138.56 for tier 2, and none for the open-ended top tier. Non-screen repairs get no warranty hints.
 
-It also returns the highest pre-tax price for the current tier, even when no lower-price hint applies. The first tier's cap is $92.37; the second is $138.56. The top tier has no cap. No warranty hints apply to non-screen repairs. Tests cover every tier boundary, all finite price caps (including the next cent), equal-profit hints, cash, custom settings, and the open-ended tier.
-
-Open **Warranty tiers** below the calculator for a quick reference showing every tier's tax-included range, warranty cost, and highest repair price before tax. It uses the same rounded-tax search as the pricing hints and follows saved settings, including tax rate and tier edits. The current screen-repair tier is highlighted; the last tier says “and up” and has no maximum. The reference starts collapsed and sits after the inputs and results, so opening it does not move them on a phone.
+Open **Warranty tiers** below the calculator for a reference table of every tier's tax-included range, warranty cost and highest pre-tax repair price. It uses the same rounded-tax search, follows saved settings, highlights the current tier, and starts collapsed below the results so opening it never moves them on a phone.
 
 ## Counter behavior and input limits
 
-- Open in **What should I charge?** (target-profit) mode, with the target set to the saved default, a screen repair paid by card and $0 parts. **Clear** restores these defaults, including the mode, and focuses part cost. Switch to **Profit from a price** at any time; the choice is not stored, so a reload or Clear returns to target mode.
-- Enter dollars and up to two decimal places, without currency signs, commas or exponent notation. Negative, blank, malformed or excessive amounts show a short message and clear the result. A zero entered repair price shows a prompt. A positive price discounted to zero shows the actual loss, including parts, warranty and any fixed card fee.
-- Price and parts are each capped at **$999,999.99** to reject accidental huge input and keep the counter UI readable. The pure engine accepts zero cents but rejects negative, fractional, non-finite and over-limit monetary inputs.
-- Losses show a red result and a “Loss” label. The margin is rounded to one decimal place for display.
-- The layout supports desktop and phone widths with labeled decimal inputs and keyboard-accessible controls. Live results do not move focus.
+- The app opens in **What should I charge?** (target-profit) mode with the saved default target, a screen repair, card payment and $0 parts. **Clear** restores these defaults, including the mode, and focuses part cost. Switch to **Profit from a price** at any time; the mode is not stored.
+- Enter dollars with up to two decimals, without currency signs, commas or exponents. Negative, blank, malformed or excessive amounts show a short message and clear the result. A zero price shows a prompt; a positive price discounted to zero shows the actual loss.
+- Price and parts are each capped at **$999,999.99**. The engine accepts zero but rejects negative, fractional, non-finite and over-limit amounts.
+- Losses show a red result and a “Loss” label. Margin is displayed to one decimal place.
+- The layout supports desktop and phone widths with labeled decimal inputs and keyboard-accessible controls. Live results never move focus.
 
 ## Shop settings
 
-Open **Settings** from the calculator to edit the default target profit, tax rate, card percentage and fixed fee, and screen-warranty tiers. Save applies changes to the current ticket immediately and stores them in this browser's localStorage. Settings are specific to the browser and device; clearing site data removes them. Missing, invalid, or corrupt saved settings fall back to the defaults in `src/config.ts`. If browser storage is unavailable, the app reports that saving failed.
+Open **Settings** to edit the default target profit, tax rate, card percentage and fixed fee, and the warranty tiers. **Save** applies immediately to the current ticket and stores the settings in this browser's localStorage (specific to the browser and device; clearing site data removes them). Missing, invalid or corrupt saved settings fall back to `src/config.ts`; if storage is unavailable the app says saving failed. Saving or resetting also sets the target field to the new default target.
 
-To copy settings between devices, save any edits, then choose **Copy settings code**. It copies a text code and shows a QR code for `https://calc.phone-fix.com/#settings=<code>`. QR generation runs locally, without external requests. If clipboard access is unavailable, select and copy the displayed code manually. Scan the QR on the other device or paste the code into **Load settings code** and choose **Review settings code**. Review the current and incoming rates and every tier, then choose **Confirm and save settings**. Cancel or Escape leaves settings unchanged. Invalid, damaged or unsupported codes cannot change settings, and the import fragment is removed from the address bar as soon as it is read.
+Rules: percentages and dollar amounts take up to two decimals; rates are 0–10,000%; amounts are capped at $999,999.99. Tier endpoints are inclusive: start at $0.00, begin each tier one cent above the previous upper bound, and leave only the final upper bound blank for “and up”. Add or remove rows as needed. Invalid settings show inline errors and cannot be saved. **Reset to defaults** asks for confirmation, clears saved settings and restores `src/config.ts`.
 
-Transfer format v2 is `PF.<base64url JSON>.<checksum>`, with `{ v: 2, target: defaultTargetProfitCents, rates: [taxBps, cardBps, fixedFeeCents], tiers: [[minCents, maxCentsOrNull, costCents], ...] }`. The checksum is the first 12 bytes of SHA-256 of the encoded payload, encoded as base64url. It detects accidental corruption, not who created a code; confirmation remains required. Strict version, shape, integer, amount and tier validation prevents partial imports. Codes are limited to 20,000 characters; lists too large for a QR can still be copied as text. This version includes all shop settings, including the saved target profit. Saved repairs stay on this browser and are not included in settings codes. Older v1 codes without target profit, unknown versions and extra fields are rejected with a request to create a new code in the current app.
+**Copy settings between devices:** save any edits, choose **Copy settings code**, and either scan the QR code (it links to `https://calc.phone-fix.com/#settings=<code>`, generated locally) or copy the text; if the clipboard is unavailable, select the displayed code manually. On the other device, scan the QR or paste into **Load settings code** and choose **Review settings code**. Compare the current and incoming rates and every tier, then **Confirm and save settings**. Cancel or Escape changes nothing, invalid codes can never change settings, and the `#settings=` fragment is removed from the address bar as soon as it is read.
 
-Enter percentages and dollar amounts with up to two decimal places. Rates must be non-negative and at most 10,000%; amounts are capped at $999,999.99. Tier endpoints are inclusive: start at $0.00, put each next tier one cent above the preceding upper bound, and leave only the final upper bound blank for “and up”. Add or remove rows as needed. Invalid settings show inline errors and cannot be saved. **Reset to defaults** asks for confirmation, clears saved settings, and immediately restores the shop defaults.
+### Settings code format
 
-## Target-profit pricing, discounts and labor time
+`PF.<base64url JSON>.<checksum>` (version 2), where the JSON is `{ v: 2, target: defaultTargetProfitCents, rates: [taxBps, cardBps, fixedFeeCents], tiers: [[minCents, maxCentsOrNull, costCents], ...] }`. The checksum is the first 12 bytes of the SHA-256 of the encoded payload, base64url-encoded; it detects accidental corruption, not who made the code, so confirmation is always required. Strict validation of version, shape, integers, amounts and tiers prevents partial imports. Codes are limited to 20,000 characters (long tier lists too big for a QR can still be copied as text). Saved repairs are **not** included. Version 1 codes (no target profit), unknown versions and extra fields are rejected with a request to make a new code. Settings saved before the target profit existed keep their rates and tiers and gain the $80 default.
 
-**What should I charge?** is the default mode on load and after Clear: enter a target profit with the same part cost, screen-repair and payment controls. The default target is **$80.00**, editable in Settings. Saving or resetting settings applies that default to the target field; Clear restores it. Older saved settings retain their rates and tiers and gain the $80 default.
+## Target-profit pricing (What should I charge?)
 
-`findTargetPrice` in `src/calc.ts` returns the **lowest pre-tax cent price** meeting the target, with a full `calculateTicket` breakdown. It searches each warranty tier separately, in price order. Exact integer bounds narrow the usual cent search. For unusual rates near or above a 100% effective card fee, a bounded search of 10,000 tax-rounding residues solves the exact half-up inequality. It does not assume profit is monotonic, even within a tier. Every suggested result is verified by `calculateTicket`. Targets that cannot be reached within the $999,999.99 price limit show a message.
+Enter a target profit with the usual part cost, screen-repair and payment controls. `findTargetPrice` in `src/calc.ts` returns the **lowest pre-tax cent price** that meets the target, with a full `calculateTicket` breakdown. It searches each warranty tier separately in price order, using exact integer bounds to narrow the cent search. For unusual rates near or above a 100% effective card fee, a bounded search over 10,000 tax-rounding residues solves the exact half-up inequality; profit is never assumed monotonic. Every result is verified by `calculateTicket`. A target that cannot be reached within $999,999.99 shows a message.
 
-The **nice price** is the first price at or above the minimum ending in .99. Its actual profit is shown, including a warning if crossing a warranty cliff puts it below the target. A boundary note shows how far a suggested price sits above the preceding tier's highest repair price.
-
-Hand check with the default settings, screen warranty, card payment, $50 parts and $80 target:
+Hand check (defaults, screen warranty, card, $50 parts, $80 target):
 
 - $162.03 × 8.25% = $13.367475 → **$13.37** tax, total **$175.40**.
-- $175.40 × 2% = $3.508 → **$3.51** fee; warranty tier 3 costs **$28.52**.
-- $162.03 − $50 − $3.51 − $28.52 = **$80.00** profit.
-- At $162.02, tax and fees remain the same, so profit is **$79.99**.
+- $175.40 × 2% = $3.508 → **$3.51** fee; tier 3 warranty **$28.52**.
+- $162.03 − $50 − $3.51 − $28.52 = **$80.00**. At $162.02 the tax, total and warranty are the same but profit is **$79.99**.
 
 ### Recommended: top of tier
 
-With the screen warranty checked, tiers are set by the **tax-included** total, so the warranty cost is the same anywhere inside a tier. Besides the **Lowest price that hits target**, the result shows **Recommended: top of tier**: the highest pre-tax price whose tax-included total is still within the lowest price's tier. It reuses `highestPriceForTotal` (the same inversion behind the tier reference table), so tax rounding is exact and the total never exceeds the tier max, even where rounding skips a total. The same example, $50 parts, $80 target, card:
+With the screen warranty on, the warranty cost is the same anywhere inside a tier, so the result also shows **Recommended: top of tier**: the highest pre-tax price whose tax-included total stays in the lowest price's tier. It reuses `highestPriceForTotal` (the same inversion behind the tier reference table), so rounding is exact and the total never exceeds the tier max. Same example:
 
-- $162.03 has total $175.40, tier 3 (up to $199.99 with tax), warranty **$28.52**.
-- $184.75 × 8.25% = $15.241875 → **$15.24** tax, total **$199.99**: still tier 3. $184.76 totals $200.00, which is tier 4.
-- $199.99 × 2% = $3.9998 → **$4.00** fee. Profit $184.75 − $50 − $4.00 − $28.52 = **$102.23**, which is **$22.23** more than at $162.03 with the same warranty cost.
+- $162.03 totals $175.40, tier 3 (tax-included range up to $199.99), warranty $28.52.
+- $184.75 × 8.25% = $15.241875 → **$15.24** tax, total **$199.99**, still tier 3; $184.76 totals $200.00, tier 4.
+- Fee $199.99 × 2% = $3.9998 → $4.00. Profit $184.75 − $50 − $4.00 − $28.52 = **$102.23**, which is **$22.23** more than at $162.03.
 
-The supporting text is one short line each, for example `Total $199.99 with tax, still tier 3, same warranty. +$22.23 profit.` The top tier has no upper limit, so it shows no recommendation. With the warranty unchecked nothing changes. If the lowest price is already the top of its tier, the note says so and shows how much more the next tier's warranty costs.
+The note under it is one line, e.g. `Total $199.99 with tax, still tier 3, same warranty. +$22.23 profit.` If the lowest price is already the top of its tier, the note says so and shows how much more the next tier's warranty costs. The open-ended top tier shows `None` and a note that it has no cap. Unchecking the warranty hides this section.
 
-**Drop a tier?** appears when the lowest price is in tier 2 or higher and the preceding tier's top price (`previousTierMaxPrice`) misses the target by no more than the warranty that dropping saves, i.e. the cost difference between the two tiers (`dropTierMaxShortfall`, exact integer cents). It shows that top price, its profit, how much it misses the target and the warranty saved, then the profit at the lowest and recommended prices, so you can judge whether the lower price is worth it. A lower tier that already met the target would itself be the lowest price, so the note never appears in that case.
+### Drop a tier?
 
-Hand check, default settings, card, $0 parts, $76.50 target. The lowest price is **$100.57** (tier 2, warranty $21.89, profit $76.50) and the recommended top of tier is $138.56 ($113.67). Tier 1 tops out at $92.37: tax $7.62, total $99.99, fee $2.00, warranty $15.26, so profit is $92.37 − $2.00 − $15.26 = **$75.11**, which is $1.39 short. That is under the **$6.63** warranty saved (tier 2 − tier 1 = $21.89 − $15.26), so the result shows: `Drop a tier? $92.37 earns $75.11 (misses target by $1.39, saves $6.63 warranty) vs $76.50 at $100.57 / $113.67 at $138.56.` A $82.00 target misses by $6.89, more than $6.63, so no note. The **Nice price** (.99) line shows only if it lands in a costlier tier (or when the warranty is unchecked).
+When the lowest price is in tier 2 or higher and the previous tier's top price (`previousTierMaxPrice`) misses the target by no more than the warranty that dropping saves (the cost difference between the two tiers, `dropTierMaxShortfall`, in exact cents), the result adds a **Drop a tier?** line: that top price, its profit, how far it misses the target, the warranty saved, and the profit at the lowest and recommended prices. A lower tier that already met the target would itself be the lowest price, so the line never appears then.
 
-In **Profit from a price** mode, the optional discount accepts a dollar amount or a percentage with up to two decimal places. Percent discounts round half-up to cents before subtraction. Tax, ticket total, card fee, warranty tier and margin use the discounted price. The result compares profit with and without the discount and flags warranty savings. For example, discounting $93 by $0.63 moves the total from $100.67 to $99.99: the warranty falls from $21.89 to $15.26, and profit **increases $6.01**. Discounts must be nonnegative and cannot exceed the price or 100%; an empty discount means zero.
+Hand check (defaults, card, $0 parts, $76.50 target): the lowest price is **$100.57** (tier 2, warranty $21.89, profit $76.50) and the recommended top of tier is $138.56 ($113.67). Tier 1 tops out at $92.37: tax $7.62, total $99.99, fee $2.00, warranty $15.26, profit **$75.11**, which is $1.39 short. That is under the **$6.63** saved ($21.89 − $15.26), so the result says: `Drop a tier? $92.37 earns $75.11 (misses target by $1.39, saves $6.63 warranty) vs $76.50 at $100.57 / $113.67 at $138.56.` An $82.00 target misses by $6.89, more than $6.63, so there is no note.
 
-Optional **labor minutes** works in both modes. It accepts up to two decimal places, from zero to 999,999.99 minutes. `calculateProfitPerHour` takes integer hundredths of a minute and rounds the final hourly profit to cents, half-up (away from zero on a loss). $80 over 45 minutes is **$106.67/hr**. Empty or zero time displays “—”; invalid time shows an inline error and hides the hourly result. Labor time never subtracts a cost or changes the ticket's profit.
+### Nice price
+
+A **Nice price** line (first price at or above the lowest price that ends in .99, with its actual profit) is shown only when the warranty is off, or when that price lands in a costlier warranty tier. It then states the extra warranty cost and whether profit falls below the target.
+
+## Discounts and labor time
+
+In **Profit from a price** mode, the optional discount is a dollar amount or a percentage with up to two decimals. Percent discounts round half-up to cents before subtraction. Tax, total, card fee, warranty tier and margin all use the discounted price, and the result compares profit with and without it and flags warranty savings. For example, discounting $93 by $0.63 moves the total from $100.67 to $99.99, the warranty falls from $21.89 to $15.26, and profit **increases $6.01**. A discount cannot exceed the price or 100%; empty means zero.
+
+Optional **labor minutes** work in both modes (up to two decimals, 0–999,999.99). `calculateProfitPerHour` takes integer hundredths of a minute and rounds hourly profit to cents, half-up (away from zero on a loss): $80 over 45 minutes is **$106.67/hr**. Empty or zero time shows “—”, and invalid time shows an inline error. Labor never changes the ticket's profit.
 
 ## Saved repairs and customer quotes
 
-Use the **Calculator** and **Saved repairs** tabs with a tap or the left/right arrow keys. Home and End select the first and last tabs. Settings remains an inline panel above the tabs.
+The **Calculator** and **Saved repairs** tabs work by tap or the left/right arrow keys (Home/End jump to the first/last). Settings is an inline panel above the tabs.
 
-**Add repair** saves a name (up to 120 characters), part cost, usual pre-tax price, screen warranty choice, and optional labor minutes. Repairs appear A–Z, with a name search when there are more than ten. Edit a repair or delete it after confirmation. Tapping a repair fills the calculator, switches to **Profit from a price** mode (its saved price is the input), and clears any discount; the current card/cash choice stays in place. **Clear** also clears the loaded repair name.
+**Add repair** saves a name (up to 120 characters), part cost, usual pre-tax price, screen-warranty choice and optional labor minutes. Repairs sort A–Z, with a name search once there are more than ten; edit them, or delete after confirmation. Tapping a repair fills the calculator, switches to **Profit from a price** with its saved price, clears any discount and keeps the current card/cash choice. **Clear** also clears the loaded repair name. **Save current as repair** opens a prefilled form: it uses the usual price in Profit from a price mode (before any discount) or the calculated lowest price in target mode. Payment and discounts are never saved.
 
-**Save current as repair** opens a prefilled form. In Profit from a price mode, it uses the usual price before any discount. In target-profit mode, it uses the calculated minimum price. Payment and temporary discounts are not saved in a preset.
+Repairs are stored under the localStorage key `phonefix-saved-repairs` as `{ version: 1, repairs: [...] }`, with money in integer cents and optional `laborHundredths`. Missing, corrupt or unknown-version data starts an empty list without touching settings; a failed write keeps the form open with an error. Saved repairs are specific to the browser and device.
 
-Repairs use their own localStorage key, `phonefix-saved-repairs`, containing `{ version: 1, repairs: [...] }`. Money is stored in integer cents and optional `laborHundredths` in hundredths of a minute. Missing, corrupt, invalid or unknown-version data starts with an empty list without modifying settings. Failed writes keep the form available with an error message. Saved repairs are specific to this browser and device; clearing site data removes them.
+**Copy quote** copies plain text such as `iPhone 13 screen: $129.99 + tax = $140.71`: the loaded repair name (or “Repair”), the discounted pre-tax price (or the lowest price in target mode) and the rounded tax-included total, with no parts, fees, warranty or profit. “Copied” confirms; if the clipboard is unavailable the quote appears selected in a text box. Invalid or empty tickets disable copying.
 
-**Copy quote** copies plain text such as `iPhone 13 screen: $129.99 + tax = $140.71`. It uses the loaded repair name or “Repair”, the current discounted pre-tax price (or suggested minimum in target mode), and the calculator's rounded tax-included total. Quotes contain no parts, fees, warranty costs or profit. A brief “Copied” message confirms success. If clipboard access is unavailable or denied, the quote appears selected in a text box for the device's Copy command. Invalid or empty tickets disable copying.
+## Chrome extension (private, sideloaded)
 
-## Chrome extension (private, toolbar popup)
+An internal Manifest V3 Chrome extension that reuses the same calculation, config, money and settings code as the web app. It is **not published** to the Chrome Web Store; each computer loads it unpacked from a local build. It has no host permissions, makes no network requests and loads no remote code.
 
-The calculator is also packaged as a Manifest V3 Chrome extension that opens from the toolbar. It uses the same calculation, config, money and settings modules as the web app. Its permissions are listed under [Right-click price suggestion](#right-click-price-suggestion-extension-phase-2); it has no host access, makes no network requests and loads no remote code. It is loaded unpacked; it is not published to the Chrome Web Store.
-
-Build it:
+### Install
 
 ```sh
 npm ci
-npm run build:extension   # writes dist-extension/
+npm run build:extension      # writes dist-extension/
 ```
 
-Load it:
-
 1. Open `chrome://extensions` and turn on **Developer mode**.
-2. Click **Load unpacked** and choose the `dist-extension` folder.
-3. Pin **PhoneFix Profit Calculator** from the puzzle-piece menu, then click its icon.
+2. **Load unpacked** and choose the `dist-extension` folder.
+3. Pin **PhoneFix Profit Calculator** from the puzzle-piece menu and click its icon to open the popup.
 
-Update it: `git pull`, run `npm run build:extension` again, then click the reload icon on the extension's card in `chrome://extensions`.
+**Update:** `git pull`, run `npm run build:extension` again, then click the reload icon on the extension's card in `chrome://extensions`. If a release adds permissions, Chrome may ask you to accept them. There is no automatic update.
 
-Settings must be imported once. The extension has its own storage (`chrome.storage.local`), separate from `calc.phone-fix.com`, and the popup has no Settings button to keep it small. In the web app, open Settings and use **Copy settings code**. Then right-click the extension's toolbar icon, choose **Options** (it opens in a tab, or use **Details → Extension options** on `chrome://extensions`), paste the code into **Load settings code**, review and confirm. The Options page is the same Settings panel as the web app and the code format is unchanged. The popup picks the new rates up the next time it opens.
+### Import your settings once
 
-Screenshot: `docs/issue-23/popup.png`. The Playwright test `tests/extension.spec.ts` builds the extension and loads it in Chromium.
+The extension keeps its own data in `chrome.storage.local`, separate from `calc.phone-fix.com`, so it starts with the built-in defaults from `src/config.ts` until you import. In the web app open **Settings → Copy settings code**. In Chrome, right-click the extension's toolbar icon and choose **Options** (or **Details → Extension options** on `chrome://extensions`), paste the code into **Load settings code**, review and confirm. Options is the same Settings panel and the same [code format](#settings-code-format). The popup and the right-click box pick up new settings the next time they open. Settings are not synced between computers, so repeat the import on each one.
 
-### Right-click price suggestion (extension phase 2)
+### Popup
 
-On any vendor page, highlight a part price (for example `$16.38`, `$19.40` or `$37.03`), right-click and choose **Suggest repair price**. The extension treats the number as the **part cost** and shows a small result box next to the selection with the same target-profit result as the web app's **What should I charge?** mode: the lowest price that hits the target ("Charge") with its profit and, for screen repairs, **Recommended: top of tier** with the same short note (plus **Drop a tier?** when it applies).
+The toolbar popup is the full calculator (both modes, discounts, labor time, warranty tier reference, **Saved repairs** and **Copy quote**) in a compact 380px layout, without the intro block or a Settings button. Saved repairs inside the popup are kept in the extension's storage and are not shared with the web app or settings codes. Screenshot: `docs/issue-23/popup.png`.
 
-- Defaults: screen repair (warranty on), card, and the saved default target profit from the settings you imported into the extension (see above; without an import, the built-in defaults are used).
-- In the box you can edit the target profit and toggle **Screen repair** and **Cash**; the result updates as you type. Press **Escape**, click outside the box or use × to close it.
-- The menu item appears only when text is selected. If the selection is not one clean price (a range like `$10 - $20`, several numbers, an empty or non-price selection, `$0.00`), the box says "Couldn't read a price" and shows no result. `src/price-parser.ts` reads the text into integer cents with the existing `parseMoney`, so no floating point is involved. It accepts an optional `$`, thousands commas, one or two decimals and short surrounding text such as `Price: $16.38 USD`; text around the number needs a `$` or `USD` marker.
-- It works on any site; there is no site-specific scraping. The page is read only through the selected text the menu hands over; the result box is a single shadow-DOM element, so page styles and the box's styles do not affect each other.
+### Right-click “Suggest repair price”
 
-Permissions (`extension/manifest.json`), all minimal:
+On a vendor page, highlight a part price (for example `$16.38`), right-click and choose **Suggest repair price**. The number is the **part cost**, and a small box next to the selection shows the same result as **What should I charge?**: the lowest price that hits the target with its profit and, for screen repairs, **Recommended: top of tier** and **Drop a tier?** when they apply.
+
+- Defaults: screen repair, card, and the default target from the settings you imported.
+- Edit the target profit or toggle **Screen repair** and **Cash** in the box; the result updates as you type. Close it with Escape, a click outside or ×.
+- The menu item appears only when text is selected. The text must be one clean price; ranges (`$10 - $20`), several numbers, percentages, negatives, `$0.00` and non-price text show “Couldn't read a price” and no result. `src/price-parser.ts` accepts an optional `$`, thousands commas, one or two decimals and short surrounding text such as `Price: $16.38 USD` (text around the number needs a `$` or `USD`), and reads it into integer cents through `parseMoney`.
+- It works on any site with no site-specific scraping. The page is read only through the selected text Chrome hands the extension, and the box is a single shadow-DOM element so page styles and the box's styles stay separate. Screenshot: `docs/issue-24/result-box.png` (uses made-up warranty costs).
+
+### Permissions (`extension/manifest.json`)
 
 | Permission | Why |
 | --- | --- |
-| `storage` | Keep the imported settings (phase 1). |
+| `storage` | Keep the imported settings and saved repairs. |
 | `contextMenus` | The **Suggest repair price** item, shown only for a selection. |
 | `activeTab` | Temporary access to the current tab after you choose the menu item. |
-| `scripting` | Inject the result box into that tab. |
+| `scripting` | Inject the result box (`suggest-box.js`, bundled in the extension) into that tab. |
 
-There are **no host permissions**, no network requests and no remote code. The result box script (`suggest-box.js`) ships inside the extension and is injected only when you choose the menu item.
+No host permissions, network requests or remote code.
 
-After pulling, run `npm run build:extension` (it now also builds `suggest-box.js` and the background worker) and reload the extension in `chrome://extensions`; Chrome may ask you to accept the new permissions.
+### Known limits
 
-Tests: `src/price-parser.test.ts` (parser) and `tests/extension-context-menu.spec.ts` (loads the built extension in Chromium on `tests/fixtures/vendor-price.html`; Chrome's native menu can't be clicked from Playwright, so the test fires the same `contextMenus.onClicked` event and uses a test-only copy of the manifest with a host permission for the local fixture server; the shipped manifest is asserted to have none). Screenshot: `docs/issue-24/result-box.png` (uses made-up warranty costs, not the shop's).
+- Chromium browsers only, sideloaded per computer, no auto-update and no settings sync (import and rebuild by hand).
+- The popup has no Settings button; use Options. Saved repairs and settings are not shared between the extension and the web app.
+- The right-click box cannot appear on pages Chrome does not let extensions script, such as `chrome://` pages and the Chrome Web Store; nothing is shown there.
+- Only a single price in the selection is read; there is no scraping of a whole page.
+
+### Extension tests
+
+`src/price-parser.test.ts` and `src/extension-storage.test.ts` (unit); `tests/extension.spec.ts` builds the extension and drives the popup and Options in Chromium; `tests/extension-context-menu.spec.ts` loads it on `tests/fixtures/vendor-price.html`. Chrome's native context menu cannot be clicked from Playwright, so that test fires the same `contextMenus.onClicked` event and uses a test-only manifest copy with a host permission for the local fixture server; the shipped manifest is asserted to have none.
