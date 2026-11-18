@@ -25,7 +25,8 @@ test('suggests the exact target price and .99 alternative with a full breakdown'
   await expect(page.locator('#warranty-value')).toHaveText('$28.52');
   await expect(page.locator('#warranty-detail')).toContainText('tier 3');
   await expect(page.locator('#profit')).toHaveText('$80.00');
-  await expect(page.locator('#nice-price')).toHaveText('Nice price: $162.99 before tax · profit $80.94');
+  await expect(page.locator('#nice-price')).toBeHidden();
+  await expect(page.locator('#target-boundary')).toBeHidden();
   await page.getByLabel('Labor minutes optional').fill('45');
   await expect(page.locator('#hourly-value')).toHaveText('$106.67/hr');
   await page.getByLabel('Cash', { exact: true }).check();
@@ -39,7 +40,7 @@ test('suggests the exact target price and .99 alternative with a full breakdown'
   await page.getByLabel('Part cost', { exact: true }).fill('0');
   await page.getByLabel('Target profit', { exact: true }).fill('75.11');
   await expect(page.locator('#suggested-price')).toHaveText('$92.37');
-  await expect(page.locator('#nice-price')).toContainText('profit $69.09 · below target');
+  await expect(page.locator('#nice-price')).toContainText('profit $69.09 · costlier warranty tier (+$6.63), below target');
 
   await page.getByLabel('Target profit', { exact: true }).fill('0');
   await page.getByLabel('Screen repair').uncheck();
@@ -57,19 +58,20 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 900 }, { name: '
     await expect(page.locator('#suggested-price')).toHaveText('$162.03');
     await expect(page.getByRole('heading', { name: /Recommended: top of tier/ })).toBeVisible();
     await expect(page.locator('#top-of-tier-price')).toHaveText('$184.75');
-    await expect(page.locator('#top-of-tier-note')).toContainText('warranty cost unchanged at $28.52. Adds $22.23 profit ($102.23 total)');
+    await expect(page.locator('#target-boundary')).toBeHidden();
+    await expect(page.locator('#top-of-tier-note')).toHaveText('Total $199.99 with tax, still tier 3, same warranty. +$22.23 profit.');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
     await page.getByLabel('Target profit', { exact: true }).fill('500');
     await expect(page.locator('#top-of-tier-price')).toHaveText('None');
-    await expect(page.locator('#top-of-tier-note')).toContainText('open-ended top tier');
+    await expect(page.locator('#top-of-tier-note')).toHaveText('Tier 12 has no cap, so there is no top-of-tier price.');
 
     await page.getByLabel('Screen repair').uncheck();
     await expect(page.locator('#top-of-tier')).toBeHidden();
   });
 }
 
-test('persists and resets the default target, and explains a nearby warranty boundary', async ({ page }) => {
+test('persists and resets the default target, and shows the drop-a-tier note near a boundary', async ({ page }) => {
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const defaultTarget = page.getByLabel('Default target profit ($)');
   await defaultTarget.fill('-1');
@@ -82,7 +84,7 @@ test('persists and resets the default target, and explains a nearby warranty bou
   await page.getByLabel('What should I charge?').check();
   await expect(page.getByLabel('Target profit', { exact: true })).toHaveValue('80.38');
   await expect(page.locator('#suggested-price')).toHaveText('$92.38');
-  await expect(page.locator('#target-boundary')).toContainText('suggested price is $0.01 above that boundary');
+  await expect(page.locator('#target-boundary')).toHaveText('Drop a tier? $92.37 earns $75.11 (misses target by $5.27) vs $80.38 at $92.38 / $125.56 at $138.56: the lower price costs more than the warranty saves.');
   await page.reload();
   await page.getByLabel('What should I charge?').check();
   await expect(page.getByLabel('Target profit', { exact: true })).toHaveValue('80.38');

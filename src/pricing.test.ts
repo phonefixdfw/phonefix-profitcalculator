@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateDiscountedTicket, calculateProfitPerHour, calculateTicket, findTargetPrice, type TargetProfitInput } from './calc';
+import { calculateDiscountedTicket, calculateProfitPerHour, calculateTicket, findTargetPrice, NEAR_BOUNDARY_WINDOW, type TargetProfitInput } from './calc';
 import { DEFAULT_CONFIG } from './config';
 import { MAX_MONEY_CENTS } from './money';
 
@@ -153,18 +153,47 @@ describe('top-of-tier recommendation', () => {
     expect(result.nextTierWarrantyIncrease).toBe(663);
   });
 
-  it('explains the step-up when the target lands just over a tier boundary', () => {
-    // Tier 1 tops out at $92.37 for $75.11; a $75.12 target is one cent short.
-    const result = findTargetPrice({ ...target, partCost: 0, targetProfit: 7_512 })!;
-    expect(result.minimum.warrantyTierIndex).toBe(1);
-    expect(result.previousTierMaxPrice).toBe(9_237);
-    expect(result.lowerTierNearMiss).toEqual({
-      price: 9_237, profit: 7_511, shortfall: 1, warrantyIncrease: 663, extraRevenue: result.minimum.price - 9_237,
+  describe('drop-a-tier note', () => {
+    // Cash, no parts, tier 2 costs only $2.00 more than tier 1: tier 1 tops out at $92.37 for $77.11.
+    const cheapStep = {
+      ...DEFAULT_CONFIG,
+      warrantyTiers: DEFAULT_CONFIG.warrantyTiers.map((tier, i) => (i === 1 ? { ...tier, cost: 1_726 } : tier)),
+    };
+    const cash = { partCost: 0, screenRepair: true, payment: 'cash' as const };
+    const at = (targetProfit: number) => findTargetPrice({ ...cash, targetProfit }, cheapStep)!;
+
+    it('is shown when the lowest price is near the boundary, with the shortfall', () => {
+      const result = at(7_900);
+      expect(result.minimum.price).toBe(9_626);
+      expect(result.minimum.warrantyTierIndex).toBe(1);
+      expect(result.previousTierMaxPrice).toBe(9_237);
+      expect(result.dropTier).toEqual({ price: 9_237, profit: 7_711, shortfall: 189 });
+      expect(result.dropTier!.profit).toBeLessThan(result.minimum.netProfit);
     });
-    // Tier 2 tops out at $138.56 (total $149.99).
-    expect(result.topOfTier).toMatchObject({ price: 13_856, ticketTotal: 14_999, warranty: 2_189 });
-    // No near miss when the lower tier is far short of the target.
-    expect(findTargetPrice(target)!.lowerTierNearMiss).toBeNull();
+
+    it('is hidden when the lower tier already meets the target', () => {
+      // Tier 1 meets this target outright, so the minimum stays in tier 1 and there is no note.
+      expect(at(7_711).dropTier).toBeNull();
+    });
+
+    it('is included at exactly the window edge and hidden one cent beyond it', () => {
+      const edge = at(8_011);
+      expect(edge.minimum.price - edge.previousTierMaxPrice!).toBe(NEAR_BOUNDARY_WINDOW);
+      expect(edge.dropTier).not.toBeNull();
+      const beyond = at(8_012);
+      expect(beyond.minimum.price - beyond.previousTierMaxPrice!).toBe(NEAR_BOUNDARY_WINDOW + 1);
+      expect(beyond.dropTier).toBeNull();
+    });
+
+    it('is hidden when the target is far above the boundary, and in tier 1', () => {
+      expect(at(9_000).dropTier).toBeNull();
+      expect(findTargetPrice(target)!.dropTier).toBeNull();
+      expect(findTargetPrice({ ...target, partCost: 0, targetProfit: 5_000 })!.dropTier).toBeNull();
+    });
+
+    it('is hidden at default rates, where one tier step costs more than the window', () => {
+      expect(findTargetPrice({ ...target, partCost: 0, targetProfit: 7_512 })!.dropTier).toBeNull();
+    });
   });
 
   it('gives no recommendation in the open-ended top tier', () => {
@@ -178,7 +207,7 @@ describe('top-of-tier recommendation', () => {
     const result = findTargetPrice({ ...target, screenRepair: false })!;
     expect(result.topOfTier).toBeNull();
     expect(result.nextTierWarrantyIncrease).toBeNull();
-    expect(result.lowerTierNearMiss).toBeNull();
+    expect(result.dropTier).toBeNull();
     expect(result.previousTierMaxPrice).toBeNull();
   });
 

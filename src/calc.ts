@@ -189,24 +189,23 @@ export interface TargetPriceResult {
   /** Extra warranty cost of the next tier up; null when warranty is off or there is none. */
   readonly nextTierWarrantyIncrease: number | null;
   /**
-   * Set when the minimum is in tier 2+ and the preceding tier's top price falls
-   * short of the target by no more than NEAR_BOUNDARY_SHORTFALL cents.
+   * Set when the minimum is in tier 2+ and sits no more than
+   * NEAR_BOUNDARY_WINDOW cents above the preceding tier's top price.
    */
-  readonly lowerTierNearMiss: LowerTierNearMiss | null;
+  readonly dropTier: DropTierOption | null;
 }
 
-export interface LowerTierNearMiss {
+export interface DropTierOption {
+  /** Top price of the preceding tier (pre-tax). */
   readonly price: number;
+  /** Net profit at that price. */
   readonly profit: number;
+  /** Cents the profit falls short of the target; 0 when it meets it. */
   readonly shortfall: number;
-  /** Warranty cost added by the higher tier. */
-  readonly warrantyIncrease: number;
-  /** Extra pre-tax price the target price needs over the lower tier's top price. */
-  readonly extraRevenue: number;
 }
 
-/** "Nearly reaches" the target: the lower tier's best price is within $5.00. */
-export const NEAR_BOUNDARY_SHORTFALL = 500;
+/** Show the "Drop a tier?" note when the lowest target price is within $5.00 pre-tax above the lower tier's top price. */
+export const NEAR_BOUNDARY_WINDOW = 500;
 
 function floorDivide(n: bigint, positiveDivisor: bigint): bigint {
   const quotient = n / positiveDivisor;
@@ -270,7 +269,7 @@ export function findTargetPrice(input: TargetProfitInput, config: ShopConfig = D
       const index = minimum.warrantyTierIndex;
       let topOfTier: TicketResult | null = null;
       let nextTierWarrantyIncrease: number | null = null;
-      let lowerTierNearMiss: LowerTierNearMiss | null = null;
+      let dropTier: DropTierOption | null = null;
       if (index !== null) {
         const tiers = config.warrantyTiers;
         if (tiers[index].max !== null) {
@@ -284,13 +283,8 @@ export function findTargetPrice(input: TargetProfitInput, config: ShopConfig = D
         if (index > 0) {
           const lowerTop = highestPriceForTotal(tiers[index - 1].max!, config.salesTaxBps);
           const lower = calculateTicket({ ...input, price: lowerTop }, config);
-          const shortfall = input.targetProfit - lower.netProfit;
-          if (shortfall > 0 && shortfall <= NEAR_BOUNDARY_SHORTFALL) {
-            lowerTierNearMiss = {
-              price: lowerTop, profit: lower.netProfit, shortfall,
-              warrantyIncrease: tiers[index].cost - tiers[index - 1].cost,
-              extraRevenue: minimum.price - lowerTop,
-            };
+          if (minimum.price - lowerTop <= NEAR_BOUNDARY_WINDOW) {
+            dropTier = { price: lowerTop, profit: lower.netProfit, shortfall: Math.max(0, input.targetProfit - lower.netProfit) };
           }
         }
       }
@@ -299,7 +293,7 @@ export function findTargetPrice(input: TargetProfitInput, config: ShopConfig = D
         nice: nicePrice <= MAX_MONEY_CENTS ? calculateTicket({ ...input, price: nicePrice }, config) : null,
         previousTierMaxPrice: index !== null && index > 0
           ? highestPriceForTotal(config.warrantyTiers[index - 1].max!, config.salesTaxBps) : null,
-        topOfTier, nextTierWarrantyIncrease, lowerTierNearMiss,
+        topOfTier, nextTierWarrantyIncrease, dropTier,
       };
     }
     low = high + 1;
