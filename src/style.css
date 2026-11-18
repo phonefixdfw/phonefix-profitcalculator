@@ -212,6 +212,8 @@ footer { display: flex; justify-content: space-between; gap: 14px; font-size: 10
 .target-result h3 { font-size: 14px; }
 .target-result h3 span { font-size: 11px; font-weight: 400; color: var(--muted); }
 #suggested-price { display: block; font-size: 38px; font-weight: 650; letter-spacing: -1px; margin-top: 10px; overflow-wrap: anywhere; }
+#top-of-tier { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--control-border); }
+#top-of-tier-price { display: block; font-size: 30px; font-weight: 650; letter-spacing: -1px; margin-top: 10px; overflow-wrap: anywhere; }
 .target-result p { font-size: 12px; line-height: 1.7; margin: 10px 0 0; }
 
 .tool-tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--control-border); margin-bottom: 24px; }

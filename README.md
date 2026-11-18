@@ -105,6 +105,16 @@ Hand check with the default settings, screen warranty, card payment, $50 parts a
 - $162.03 − $50 − $3.51 − $28.52 = **$80.00** profit.
 - At $162.02, tax and fees remain the same, so profit is **$79.99**.
 
+### Recommended: top of tier
+
+With the screen warranty checked, tiers are set by the **tax-included** total, so the warranty cost is the same anywhere inside a tier. Besides the **Lowest price that hits target**, the result shows **Recommended: top of tier**: the highest pre-tax price whose tax-included total is still within the lowest price's tier. It reuses `highestPriceForTotal` (the same inversion behind the tier reference table), so tax rounding is exact and the total never exceeds the tier max, even where rounding skips a total. The same example, $50 parts, $80 target, card:
+
+- $162.03 has total $175.40, tier 3 (up to $199.99 with tax), warranty **$28.52**.
+- $184.75 × 8.25% = $15.241875 → **$15.24** tax, total **$199.99**: still tier 3. $184.76 totals $200.00, which is tier 4.
+- $199.99 × 2% = $3.9998 → **$4.00** fee. Profit $184.75 − $50 − $4.00 − $28.52 = **$102.23**, which is **$22.23** more than at $162.03 with the same warranty cost.
+
+The top tier has no upper limit, so it shows no recommendation. With the warranty unchecked nothing changes. If the lowest price is already the top of its tier, the note says so and shows how much more the next tier's warranty costs. If the preceding tier's best price falls short of the target by $5.00 or less, the boundary note also compares the higher tier's added warranty cost with the extra price needed to step up. A nice .99 price that lands in a costlier tier is flagged.
+
 In **Profit from a price** mode, the optional discount accepts a dollar amount or a percentage with up to two decimal places. Percent discounts round half-up to cents before subtraction. Tax, ticket total, card fee, warranty tier and margin use the discounted price. The result compares profit with and without the discount and flags warranty savings. For example, discounting $93 by $0.63 moves the total from $100.67 to $99.99: the warranty falls from $21.89 to $15.26, and profit **increases $6.01**. Discounts must be nonnegative and cannot exceed the price or 100%; an empty discount means zero.
 
 Optional **labor minutes** works in both modes. It accepts up to two decimal places, from zero to 999,999.99 minutes. `calculateProfitPerHour` takes integer hundredths of a minute and rounds the final hourly profit to cents, half-up (away from zero on a loss). $80 over 45 minutes is **$106.67/hr**. Empty or zero time displays “—”; invalid time shows an inline error and hides the hourly result. Labor time never subtracts a cost or changes the ticket's profit.
