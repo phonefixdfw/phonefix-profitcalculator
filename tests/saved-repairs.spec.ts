@@ -7,6 +7,7 @@ test.beforeEach(async ({ page }) => {
   page.on('pageerror', (error) => messages.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') messages.push(message.text()); });
   await page.goto('/');
+  await page.getByLabel('Profit from a price').check();
 });
 test.afterEach(async ({ page }) => {
   expect(errors.get(page)).toEqual([]);
@@ -58,6 +59,7 @@ test('creates, reloads, loads, edits and confirms deletion of a saved repair', a
   await addRepair(page);
   await expect(page.getByRole('status').filter({ hasText: 'Repair saved.' })).toBeVisible();
   await page.reload();
+  await page.getByLabel('Profit from a price').check();
   await page.getByLabel('Discount optional, before tax').fill('5');
   await page.getByLabel('What should I charge?').check();
   await page.getByLabel('Cash', { exact: true }).check();
@@ -87,6 +89,7 @@ test('creates, reloads, loads, edits and confirms deletion of a saved repair', a
   await form.getByRole('button', { name: 'Save repair' }).click();
   await expect(page.locator('.repair-title')).toHaveText('iPhone 13 battery');
   await page.reload();
+  await page.getByLabel('Profit from a price').check();
   await page.getByRole('tab', { name: 'Saved repairs' }).click();
   await page.getByRole('button', { name: /^iPhone 13 battery \$/ }).click();
   await expect(page.getByLabel('Repair price before tax')).toHaveValue('89.99');
@@ -102,6 +105,7 @@ test('creates, reloads, loads, edits and confirms deletion of a saved repair', a
   await expect(page.getByText('No saved repairs yet.', { exact: false })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add repair', exact: true })).toBeFocused();
   await page.reload();
+  await page.getByLabel('Profit from a price').check();
   await page.getByRole('tab', { name: 'Saved repairs' }).click();
   await expect(page.locator('.repair-title')).toHaveCount(0);
 });
@@ -140,6 +144,7 @@ test('sorts A-Z, searches lists over ten repairs, and treats names as plain text
   await page.evaluate((names) => localStorage.setItem('phonefix-saved-repairs', JSON.stringify({ version: 1,
     repairs: names.map((name, index) => ({ id: String(index), name, price: 10000, partCost: 2000, screenRepair: false })) })), names);
   await page.reload();
+  await page.getByLabel('Profit from a price').check();
   await page.getByRole('tab', { name: 'Saved repairs' }).click();
   await expect(page.locator('.repair-title')).toHaveText(['<img src=x onerror=alert(1)>', 'Battery', ...names.slice(3), 'Zulu']);
   const search = page.getByLabel('Search saved repairs');
@@ -179,6 +184,7 @@ test('validates the form and keeps unsaved input when storage fails', async ({ p
 test('starts empty after corrupt storage without changing shop settings', async ({ page }) => {
   await page.evaluate(() => localStorage.setItem('phonefix-saved-repairs', '{broken'));
   await page.reload();
+  await page.getByLabel('Profit from a price').check();
   await page.getByRole('tab', { name: 'Saved repairs' }).click();
   await expect(page.getByText('No saved repairs yet.', { exact: false })).toBeVisible();
   await page.getByRole('tab', { name: 'Calculator' }).click();
@@ -188,6 +194,7 @@ test('starts empty after corrupt storage without changing shop settings', async 
 
 test('copies named customer quotes with dollar and percent discounts, and resets the name on Clear', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.getByLabel('Profit from a price').check();
   await expect(page.getByRole('button', { name: 'Copy quote', exact: true })).toBeDisabled();
   await addRepair(page);
   await page.getByRole('button', { name: /^iPhone 13 screen \$/ }).click();
@@ -208,6 +215,8 @@ test('copies named customer quotes with dollar and percent discounts, and resets
   await expect(page.getByRole('button', { name: 'Copy quote', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Clear' }).click();
   await expect(page.locator('#loaded-repair')).toBeHidden();
+  await expect(page.getByLabel('What should I charge?')).toBeChecked();
+  await page.getByLabel('Profit from a price').check();
   await page.getByLabel('Repair price before tax').fill('129.99');
   await copy('Repair: $129.99 + tax = $140.71');
   await page.getByLabel('What should I charge?').check();

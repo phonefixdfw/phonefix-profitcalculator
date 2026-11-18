@@ -40,6 +40,7 @@ test('opens and calculates offline after the first visit, including settings and
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('request', (request) => { if (new URL(request.url()).hostname !== '127.0.0.1') external.push(request.url()); });
   await page.goto('/');
+  await page.getByLabel('Profit from a price').check();
   await waitForOfflineApp(page);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Sales tax rate (%)').fill('10');
@@ -48,6 +49,7 @@ test('opens and calculates offline after the first visit, including settings and
   try {
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Know what you keep.' })).toBeVisible();
+    await page.getByLabel('Profit from a price').check();
     await page.getByLabel('Repair price before tax').fill('91');
     await expect(page.locator('#tax-value')).toHaveText('$9.10');
     await expect(page.locator('#profit')).toHaveText('$67.11');
@@ -92,6 +94,7 @@ test('offers a waiting deploy on the next load and activates it only after reloa
     updated = true;
     await page.reload();
     await expect(page.getByRole('button', { name: 'Updated, reload' })).toBeVisible();
+    await page.getByLabel('Profit from a price').check();
     await page.getByLabel('Repair price before tax').fill('91');
     await expect(page.locator('#tax-value')).toHaveText('$9.10');
     const waiting = await page.evaluate(async () => Boolean((await navigator.serviceWorker.getRegistration())?.waiting));

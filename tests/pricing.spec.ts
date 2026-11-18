@@ -7,6 +7,7 @@ test.beforeEach(async ({ page }) => {
   page.on('pageerror', (error) => messages.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') messages.push(message.text()); });
   await page.goto('/');
+  await page.getByLabel('Profit from a price').check();
 });
 test.afterEach(async ({ page }) => {
   expect(errors.get(page)).toEqual([]);
@@ -52,6 +53,7 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 900 }, { name: '
   test(`shows lowest and top-of-tier prices on ${viewport.name}`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/');
+    await page.getByLabel('Profit from a price').check();
     await page.getByLabel('What should I charge?').check();
     await page.getByLabel('Part cost', { exact: true }).fill('50');
     await expect(page.getByRole('heading', { name: /Lowest price that hits target/ })).toBeVisible();
@@ -101,8 +103,8 @@ test('persists and resets the default target, and hides the drop-a-tier note whe
   await expect(page.getByLabel('Target profit', { exact: true })).toHaveValue('80.00');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Clear' }).click();
-  await expect(page.getByLabel('Profit from a price')).toBeChecked();
-  await expect(page.locator('#target-result')).toBeHidden();
+  await expect(page.getByLabel('What should I charge?')).toBeChecked();
+  await expect(page.locator('#target-result')).toBeVisible();
 });
 
 test('recalculates discounted tickets and hourly profit, including a full-discount loss', async ({ page }) => {
@@ -179,4 +181,16 @@ test('rejects invalid and huge inputs without NaN, Infinity or stale suggestions
   await expect(page.locator('#input-status')).toContainText('cannot be reached');
   await expect(page.locator('#target-result')).toBeHidden();
   await expect(page.locator('.results-panel')).not.toContainText(/NaN|Infinity/);
+});
+
+test('opens in What should I charge? mode and Clear returns to it', async ({ page }) => {
+  await page.reload();
+  await expect(page.getByLabel('What should I charge?')).toBeChecked();
+  await expect(page.getByLabel('Target profit', { exact: true })).toHaveValue('80.00');
+  await expect(page.getByLabel('Repair price before tax')).toBeHidden();
+  await page.getByLabel('Profit from a price').check();
+  await expect(page.getByLabel('Repair price before tax')).toBeVisible();
+  await page.getByRole('button', { name: 'Clear' }).click();
+  await expect(page.getByLabel('What should I charge?')).toBeChecked();
+  await expect(page.getByLabel('Target profit', { exact: true })).toHaveValue('80.00');
 });

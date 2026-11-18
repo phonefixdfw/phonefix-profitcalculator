@@ -43,8 +43,8 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
           <fieldset class="payment-field calculator-mode">
             <legend>Calculate</legend>
             <div class="payment-options">
-              <label><input id="normal-mode" type="radio" name="mode" value="profit" checked /><span>Profit from a price</span></label>
-              <label><input id="target-mode" type="radio" name="mode" value="target" /><span>What should I charge?</span></label>
+              <label><input id="normal-mode" type="radio" name="mode" value="profit" /><span>Profit from a price</span></label>
+              <label><input id="target-mode" type="radio" name="mode" value="target" checked /><span>What should I charge?</span></label>
             </div>
           </fieldset>
           <div id="price-field" class="field">
@@ -374,7 +374,7 @@ element('clear').addEventListener('click', () => {
   repairName = undefined;
   element('loaded-repair').hidden = true;
   update();
-  priceInput.focus();
+  (targetMode.checked ? partInput : priceInput).focus();
 });
 element('save-current-repair').addEventListener('click', () => {
   selectTab('saved-repairs-tab');
