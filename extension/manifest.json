@@ -18,10 +18,17 @@
     "128": "icons/app-512.png"
   },
   "permissions": [
-    "storage"
+    "storage",
+    "contextMenus",
+    "activeTab",
+    "scripting"
   ],
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
   }
 }
