@@ -34,3 +34,11 @@ export const DEFAULT_CONFIG: ShopConfig = {
     { min: 60_000, max: null, cost: 8_818 },
   ],
 };
+
+/**
+ * chrome.scripting.executeScript drops `null` values from its arguments, so the
+ * open-ended last tier (`max: null`) arrives with no `max` at all. Restore it.
+ */
+export function reviveTransportedConfig(config: ShopConfig): ShopConfig {
+  return { ...config, warrantyTiers: config.warrantyTiers.map((tier) => ({ ...tier, max: tier.max ?? null })) };
+}

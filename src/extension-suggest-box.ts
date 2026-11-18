@@ -1,5 +1,5 @@
 import { findTargetPrice } from './calc';
-import type { ShopConfig } from './config';
+import { reviveTransportedConfig, type ShopConfig } from './config';
 import { formatMoney, parseMoney } from './money';
 import { summarizeTarget } from './target-summary';
 
@@ -82,7 +82,8 @@ export function showSuggestBox(request: SuggestRequest): void {
   close.setAttribute('aria-label', 'Close');
   close.addEventListener('click', dismiss);
 
-  const { partCostCents, config } = request;
+  const { partCostCents } = request;
+  const config = reviveTransportedConfig(request.config);
   if (typeof partCostCents !== 'number') { // null (or dropped in transit) means no clean price
     box.append(close, el('h2', undefined, 'Suggest repair price'), el('p', 'error', "Couldn't read a price. Highlight just one price, like $16.38."));
   } else {
@@ -111,7 +112,7 @@ export function showSuggestBox(request: SuggestRequest): void {
       let suggestion;
       try {
         suggestion = findTargetPrice({ partCost: partCostCents, targetProfit: goal.cents, screenRepair: screen.checked, payment: cash.checked ? 'cash' : 'card' }, config);
-      } catch { suggestion = null; }
+      } catch { out.append(el('p', 'error', "Couldn't calculate with the saved settings. Open the extension and check Settings.")); return; }
       if (!suggestion) { out.append(el('p', 'error', 'This target cannot be reached with these costs and fees.')); return; }
       const result = suggestion.minimum;
       out.append(row('Charge (before tax)', formatMoney(result.price), 'big'), row('Profit', formatMoney(result.netProfit)));
