@@ -116,6 +116,15 @@ test('right-click "Suggest repair price" shows the target-profit box on a vendor
     await page.mouse.click(20, 500);
     await expect(box).toHaveCount(0);
 
+    // Issue #31: default settings (nothing saved) and a $418.88 part land in the open-ended top tier.
+    await page.evaluate(() => { document.querySelector('#price')!.textContent = '$418.88'; });
+    await worker.evaluate(async () => { await (globalThis as any).chrome.storage.local.remove('phonefix-extension-data'); });
+    await rightClick('#price');
+    await expect(ui).toContainText('$418.88');
+    await expect(ui).not.toContainText('cannot be reached');
+    await expect(ui.locator('.row', { hasText: 'Charge' }).locator('span').nth(1)).toHaveText('$600.05');
+    await page.keyboard.press('Escape');
+
     // Range: a clear message, no guess.
     await rightClick('#range');
     await expect(ui).toContainText("Couldn't read a price");

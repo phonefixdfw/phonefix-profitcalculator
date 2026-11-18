@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyRate, calculateTicket, findWarrantyTier, getWarrantyTierReference, highestPriceForTotal, type TicketInput } from './calc';
+import { applyRate, calculateTicket, findTargetPrice, findWarrantyTier, getWarrantyTierReference, highestPriceForTotal, type TicketInput } from './calc';
 import { DEFAULT_CONFIG, type ShopConfig } from './config';
 import { MAX_MONEY_CENTS } from './money';
 
@@ -220,5 +220,25 @@ describe('individual shop setting changes', () => {
   it('uses a changed warranty cost for the selected tier', () => {
     const warrantyTiers = DEFAULT_CONFIG.warrantyTiers.map((tier, index) => index === 0 ? { ...tier, cost: 2_000 } : tier);
     expect(calculateTicket(input, { ...DEFAULT_CONFIG, warrantyTiers })).toMatchObject({ warranty: 2_000, warrantyTierIndex: 0, netProfit: 6_903 });
+  });
+});
+
+describe('findTargetPrice for expensive parts (issue #31)', () => {
+  const cases = [30_000, 41_888, 50_000, 99_999];
+  for (const partCost of cases) for (const screenRepair of [true, false]) for (const payment of ['card', 'cash'] as const) {
+    it(`finds the lowest price for part ${partCost}, screen ${screenRepair}, ${payment}`, () => {
+      const result = findTargetPrice({ partCost, targetProfit: 8_000, screenRepair, payment });
+      expect(result).not.toBeNull();
+      const price = result!.minimum.price;
+      expect(calculateTicket({ partCost, price, screenRepair, payment }).netProfit).toBeGreaterThanOrEqual(8_000);
+      expect(calculateTicket({ partCost, price: price - 1, screenRepair, payment }).netProfit).toBeLessThan(8_000);
+    });
+  }
+
+  it('prices the $418.88 screen part on a card in the open-ended top tier', () => {
+    const result = findTargetPrice({ partCost: 41_888, targetProfit: 8_000, screenRepair: true, payment: 'card' })!;
+    expect(result.minimum.price).toBe(60_005);
+    expect(result.minimum.warranty).toBe(8_818);
+    expect(result.topOfTier).toBeNull();
   });
 });
