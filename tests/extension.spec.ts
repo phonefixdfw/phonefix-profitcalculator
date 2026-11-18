@@ -16,7 +16,7 @@ test('built extension popup calculates, imports a settings code on the options p
 
   const manifest = JSON.parse(readFileSync(join(extensionDir, 'manifest.json'), 'utf8'));
   expect(manifest.manifest_version).toBe(3);
-  expect(manifest.permissions).toEqual(['storage']);
+  expect(manifest.permissions).toEqual(['storage', 'contextMenus', 'activeTab', 'scripting']);
   expect(manifest.host_permissions).toBeUndefined();
   expect(manifest.options_ui).toEqual({ page: 'options.html', open_in_tab: true });
 
